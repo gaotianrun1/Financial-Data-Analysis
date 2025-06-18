@@ -1,3 +1,9 @@
+# =============================================================================
+# Time Series Forecasting PyTorch Project .gitignore
+# =============================================================================
+
+# Python
+# =============================================================================
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -128,6 +134,210 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Machine Learning & Data Science
+# =============================================================================
+# PyTorch model files
+*.pth
+*.pt
+*.pkl
+*.pickle
+
+# TensorFlow
+*.pb
+*.ckpt
+checkpoints/
+
+# Weights and Biases
+wandb/
+
+# MLflow
+mlruns/
+
+# Data files
+# =============================================================================
+# Large data files
+*.csv
+*.tsv
+*.json
+*.jsonl
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.xlsx
+*.xls
+
+# Dataset directories
+data/
+datasets/
+raw_data/
+processed_data/
+
+# Specific to this project - comment out if you want to track some data
+# /ssdwork/gaotianrun/findataset/  # This is your external data path
+
+# Output files
+# =============================================================================
+# Model outputs
+outputs/
+models/
+checkpoints/
+saved_models/
+
+# Prediction results
+*predictions*.csv
+*results*.csv
+*output*.csv
+
+# Plots and visualizations
+plots/
+figures/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.pdf
+*.eps
+
+# Logs and metrics
+logs/
+*.log
+metrics/
+tensorboard_logs/
+
+# IDE and Editor
+# =============================================================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
 # System Files
-Thumbs.db
+# =============================================================================
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Project Specific
+# =============================================================================
+# Configuration files with sensitive data
+config_local.py
+secrets.py
+.env.local
+.env.production
+
+# Temporary test files
+test_*.py
+temp_*.py
+scratch_*.py
+
+# Cache directories
+.cache/
+cache/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Runtime files
+*.pid
+*.lock
+
+# Documentation build
+_build/
+_static/
+_templates/
+
+# Project specific files that should be ignored
+# =============================================================================
+# Core dump files (like the 37GB core.39858 file)
+core.*
+*.core
+*.dump
+
+# API keys and sensitive configuration
+config_local.py
+.api_keys
+api_keys.txt
+
+# Large temporary files
+*.large
+*.big
+
+# Custom additions (uncomment as needed)
+# =============================================================================
+# If you want to ignore specific output directories:
+# outputs/plots/
+# outputs/models/
+# outputs/processed_data/
+
+# If you want to ignore all jupyter notebooks:
+# *.ipynb
+
+# If you want to ignore all config files:
+# config*.py
+
+# If you want to ignore all test files:
+# test_*.py
+# tests/
+
+# =============================================================================
+# End of .gitignore
+# ============================================================================= 

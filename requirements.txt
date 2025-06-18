@@ -2,3 +2,6 @@ numpy
 torch
 alpha_vantage
 matplotlib
+pandas
+pyarrow
+scikit-learn
