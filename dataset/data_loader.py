@@ -18,8 +18,8 @@ def load_parquet_data(config):
     print(f"测试数据形状: {test_df.shape}")
     
     # 数据清洗和预处理
-    train_cleaned = preprocess_financial_data(train_df)
-    test_cleaned = preprocess_financial_data(test_df)
+    train_cleaned = process_data(train_df)
+    test_cleaned = process_data(test_df)
     
     # 保存预处理后的数据
     processed_dir = config["data"]["processed_dir"]
@@ -36,22 +36,21 @@ def load_parquet_data(config):
     
     return train_cleaned, test_cleaned
 
-def preprocess_financial_data(df):
+def process_data(df):
     """
-    对金融数据进行预处理和清洗
+    数据清洗，处理缺失值和极端异常值
     """
     print(f"开始数据预处理，原始数据形状: {df.shape}")
-    
-    # 复制数据避免修改原始数据
+
     df_processed = df.copy()
     
-    # 1. 检查和处理缺失值
+    # 检查和处理缺失值
     missing_count = df_processed.isnull().sum().sum()
     if missing_count > 0:
         print(f"发现 {missing_count} 个缺失值，使用前向填充处理")
         df_processed = df_processed.fillna(method='ffill').fillna(method='bfill')
     
-    # 2. 简化的异常值处理（只处理极端异常值）
+    # 简化的异常值处理（只处理极端异常值）
     numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
     numeric_cols = [col for col in numeric_cols if col != 'label']  # 排除标签列
     
@@ -85,14 +84,14 @@ def preprocess_financial_data(df):
     else:
         print("未发现需要处理的极端异常值")
     
-    # 3. 特征工程：添加时间相关特征（如果有时间戳索引）
-    if isinstance(df_processed.index, pd.DatetimeIndex):
-        df_processed['hour'] = df_processed.index.hour
-        df_processed['minute'] = df_processed.index.minute
-        df_processed['day_of_week'] = df_processed.index.dayofweek
-        print("添加了时间相关特征: hour, minute, day_of_week")
+    # # 特征工程：添加时间相关特征（如果有时间戳索引）
+    # if isinstance(df_processed.index, pd.DatetimeIndex):
+    #     df_processed['hour'] = df_processed.index.hour
+    #     df_processed['minute'] = df_processed.index.minute
+    #     df_processed['day_of_week'] = df_processed.index.dayofweek
+    #     print("添加了时间相关特征: hour, minute, day_of_week")
     
-    # 4. 检查并处理可能的无穷值
+    # 检查并处理可能的无穷值
     inf_count = np.isinf(df_processed.select_dtypes(include=[np.number])).sum().sum()
     if inf_count > 0:
         print(f"发现 {inf_count} 个无穷值，将其替换为0")
@@ -122,41 +121,30 @@ def load_processed_data(config, use_cache=True):
         print("缓存不存在或选择重新处理，开始加载原始数据...")
         return load_parquet_data(config)
 
-def download_data(config):
+# def download_data(config):
+#     """
+#     保留原有的Alpha Vantage API下载功能（向后兼容）
+#     """
+#     ts = TimeSeries(key=config["alpha_vantage"]["key"])
+#     # 使用免费的 get_daily 而不是付费的 get_daily_adjusted
+#     data, meta_data = ts.get_daily(config["alpha_vantage"]["symbol"], outputsize=config["alpha_vantage"]["outputsize"])
+
+#     data_date = [date for date in data.keys()]
+#     data_date.reverse()
+
+#     # 使用普通的收盘价而不是调整后的收盘价
+#     data_close_price = [float(data[date]["4. close"]) for date in data.keys()]
+#     data_close_price.reverse()
+#     data_close_price = np.array(data_close_price)
+
+#     num_data_points = len(data_date)
+#     display_date_range = "from " + data_date[0] + " to " + data_date[num_data_points-1]
+#     print("Number data points", num_data_points, display_date_range)
+
+#     return data_date, data_close_price, num_data_points, display_date_range
+
+def prepare_data_x(df, window_size, feature_cols):
     """
-    保留原有的Alpha Vantage API下载功能（向后兼容）
-    """
-    ts = TimeSeries(key=config["alpha_vantage"]["key"])
-    # 使用免费的 get_daily 而不是付费的 get_daily_adjusted
-    data, meta_data = ts.get_daily(config["alpha_vantage"]["symbol"], outputsize=config["alpha_vantage"]["outputsize"])
-
-    data_date = [date for date in data.keys()]
-    data_date.reverse()
-
-    # 使用普通的收盘价而不是调整后的收盘价
-    data_close_price = [float(data[date]["4. close"]) for date in data.keys()]
-    data_close_price.reverse()
-    data_close_price = np.array(data_close_price)
-
-    num_data_points = len(data_date)
-    display_date_range = "from " + data_date[0] + " to " + data_date[num_data_points-1]
-    print("Number data points", num_data_points, display_date_range)
-
-    return data_date, data_close_price, num_data_points, display_date_range
-
-def prepare_data_x(x, window_size):
-    """
-    为单特征时间序列创建滑动窗口（保留向后兼容性）
-    """
-    # perform windowing
-    n_row = x.shape[0] - window_size + 1
-    output = np.lib.stride_tricks.as_strided(x, shape=(n_row, window_size), strides=(x.strides[0], x.strides[0]))
-    return output[:-1], output[-1]
-
-def prepare_multivariate_data_x(df, window_size, feature_cols):
-    """
-    为多特征时间序列创建滑动窗口
-    
     Args:
         df: pandas DataFrame，包含时间序列数据
         window_size: 窗口大小
@@ -177,50 +165,27 @@ def prepare_multivariate_data_x(df, window_size, feature_cols):
     
     for i in range(n_samples):
         data_x[i] = feature_data[i:i+window_size]
-    
-    # 最后一个窗口用于预测
+
+    # 最后一个窗口没有可预测值
     data_x_unseen = feature_data[-window_size:]
     
     return data_x[:-1], data_x_unseen
 
-def prepare_data_y(x, window_size):
-    """
-    为单特征时间序列创建标签（保留向后兼容性）
-    """
-    # # perform simple moving average
-    # output = np.convolve(x, np.ones(window_size), 'valid') / window_size
-
-    # use the next day as label
-    output = x[window_size:]
-    return output
-
-def prepare_multivariate_data_y(df, window_size, target_col='label'):
-    """
-    为多特征时间序列创建标签
-    
-    Args:
-        df: pandas DataFrame，包含时间序列数据
-        window_size: 窗口大小
-        target_col: 目标列名
-    
-    Returns:
-        data_y: 标签数组
-    """
+def prepare_data_y(df, window_size, target_col='label'):
     target_data = df[target_col].values.astype(np.float32)
     data_y = target_data[window_size:]
     return data_y
 
 class TimeSeriesDataset(Dataset):
     def __init__(self, x, y):
-        # 检查输入数据的维度
         if len(x.shape) == 2:
-            # 单特征数据，需要扩展维度 [batch, sequence] -> [batch, sequence, features]
+            # [batch, sequence] -> [batch, sequence, features]
             x = np.expand_dims(x, 2)
         elif len(x.shape) == 3:
-            # 多特征数据，已经是正确的形状 [batch, sequence, features]
+            # [batch, sequence, features]
             pass
         else:
-            raise ValueError(f"输入数据x的维度不正确，期望2D或3D，得到{len(x.shape)}D")
+            raise ValueError(f"输入数据x的维度不正确，期望2,3，得到{len(x.shape)}D")
             
         self.x = x.astype(np.float32)
         self.y = y.astype(np.float32)

@@ -10,7 +10,7 @@ CONFIG = {
         "data_source": "parquet",  # "alpha_vantage" 或 "parquet"
         "train_path": "/ssdwork/gaotianrun/findataset/train.parquet",
         "test_path": "/ssdwork/gaotianrun/findataset/test.parquet",
-        "processed_dir": "outputs/processed_data",
+        "processed_dir": "data/processed_data",
         
         # 特征设置
         "target_column": "label",
@@ -19,7 +19,7 @@ CONFIG = {
         
         # 时间序列设置
         "window_size": 20,
-        "train_split_size": 0.80,
+        "train_split_size": 0.90,
         
         # 数据预处理设置
         "handle_outliers": True,
@@ -42,10 +42,10 @@ CONFIG = {
         "dropout": 0.3,   # 增加dropout以防止过拟合
     },
     "training": {
-        "device": "cpu", # "cuda" or "cpu"
+        "device": "cuda", # "cuda" or "cpu"
         "batch_size": 64,
         "num_epoch": 10,
-        "learning_rate": 0.01,
+        "learning_rate": 0.001,
         "scheduler_step_size": 40,
     }
 } 
