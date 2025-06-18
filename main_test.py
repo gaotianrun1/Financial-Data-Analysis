@@ -10,42 +10,26 @@ from model.lstm_model import LSTMModel
 from train.trainer import train_model
 from inference.predictor import predict_on_dataset
 from config import CONFIG
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import matplotlib.pyplot as plt
+from postprocess.evaluator import evaluate_model_performance, save_evaluation_results, compare_predictions
+from postprocess.visualizer import create_comprehensive_plots
 from datetime import datetime
 
 def select_device():
     if torch.cuda.is_available():
-        gpu_count = torch.cuda.device_count()
-        print(f"检测到 {gpu_count} 个GPU设备")
-
-        selected_device = "cuda:0"
-
         torch.cuda.empty_cache()
-
-        return selected_device
+        return "cuda:0"
     else:
         print("CUDA不可用")
         return "cpu"
 
 def main():
-    FEATURE_COUNT = 10
-    WINDOW_SIZE = 10
     DATA_DIR = "data"
-    
-    print("=" * 60)
-    print("快速测试配置")
-    print("=" * 60)
-    print(f"特征数量: {FEATURE_COUNT}")
-    print(f"窗口大小: {WINDOW_SIZE}")
-    print(f"数据目录: {DATA_DIR}")
 
     config = CONFIG.copy()
 
     selected_device = select_device()
     config["training"]["device"] = selected_device
-    
-    print("\n=== 检查预处理数据 ===")
+
     if not check_preprocessed_data_exists(DATA_DIR):
         print("未找到预处理数据!")
     else:
@@ -77,17 +61,12 @@ def main():
         return
     
     # 创建数据集
-    print("\n=== 创建数据集 ===")
     dataset_train = TimeSeriesDataset(data_x_train, data_y_train)
     dataset_val = TimeSeriesDataset(data_x_val, data_y_val)
     
-    print(f"训练集大小: {len(dataset_train)}")
-    print(f"验证集大小: {len(dataset_val)}")
-    
-    # 快速测试配置
     config["data"]["window_size"] = metadata["window_size"]
     config["model"]["input_size"] = metadata["feature_count"]
-    config["training"]["num_epoch"] = 20
+    config["training"]["num_epoch"] = 10
     config["training"]["batch_size"] = 32
     
     print(f"\n=== 模型配置 ===")
@@ -97,7 +76,6 @@ def main():
     print(f"批次大小: {config['training']['batch_size']}")
     
     # 创建模型
-    print("\n=== 创建模型 ===")
     model = LSTMModel(
         input_size=config["model"]["input_size"], 
         hidden_layer_size=32,  # 减少隐藏层大小以加快训练
@@ -130,33 +108,21 @@ def main():
     data_y_train_original = target_scaler.inverse_transform(data_y_train.reshape(-1, 1)).flatten()
     data_y_val_original = target_scaler.inverse_transform(data_y_val.reshape(-1, 1)).flatten()
     
-    # 计算预测指标
-    print("\n=== 预测性能评估 ===")
-    try:  
-        # 训练集性能
-        train_mse = mean_squared_error(data_y_train_original, predicted_train_original)
-        train_mae = mean_absolute_error(data_y_train_original, predicted_train_original)
-        train_r2 = r2_score(data_y_train_original, predicted_train_original)
-        
-        print(f"训练集 - MSE: {train_mse:.6f}, MAE: {train_mae:.6f}, R²: {train_r2:.6f}")
-        
-        # 验证集性能
-        val_mse = mean_squared_error(data_y_val_original, predicted_val_original)
-        val_mae = mean_absolute_error(data_y_val_original, predicted_val_original)
-        val_r2 = r2_score(data_y_val_original, predicted_val_original)
-        
-        print(f"验证集 - MSE: {val_mse:.6f}, MAE: {val_mae:.6f}, R²: {val_r2:.6f}")
-    except Exception as e:
-        print(f"评估指标计算出错: {e}")
+    # 计算预测指标 - 使用新的评估模块
+    evaluation_results = evaluate_model_performance(
+        data_y_train_original, predicted_train_original,
+        data_y_val_original, predicted_val_original
+    )
+    
+    # 显示详细的预测对比
+    compare_predictions(data_y_val_original, predicted_val_original, n_samples=10)
 
     # 创建时间戳文件夹
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = f"outputs/{timestamp}"
     models_dir = f"{output_dir}/models"
-    plots_dir = f"{output_dir}/plots"
     
     os.makedirs(models_dir, exist_ok=True)
-    os.makedirs(plots_dir, exist_ok=True)
     print(f"创建输出目录: {output_dir}")
     
     # 保存模型
@@ -184,30 +150,15 @@ def main():
     except Exception as e:
         print(f"保存预测结果出错: {e}")
     
-    # 可视化
-    try:
-        plt.switch_backend('Agg')
-        
-        # 绘制验证集的预测结果（只显示前100个点）
-        n_plot = min(200, len(data_y_val_original))
-        
-        plt.figure(figsize=(12, 6))
-        plt.plot(data_y_val_original[:n_plot], label='Actual', alpha=0.7)
-        plt.plot(predicted_val_original[:n_plot], label='Predicted', alpha=0.7)
-        plt.title('Validation Set Prediction Comparison (First 100 Samples)')
-        plt.xlabel('Sample Index')
-        plt.ylabel('Target Value')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        plot_path = f"{plots_dir}/prediction_comparison.png"
-        plt.savefig(plot_path, dpi=100, bbox_inches='tight')
-        plt.close()
-        
-        print(f"预测对比图已保存到: {plot_path}")
-        
-    except Exception as e:
-        print(f"生成可视化图表失败: {e}")
+    # 保存评估结果
+    save_evaluation_results(evaluation_results, output_dir)
+    
+    # 生成综合可视化图表
+    create_comprehensive_plots(
+        data_y_train_original, predicted_train_original,
+        data_y_val_original, predicted_val_original,
+        output_dir
+    )
     
     print(f"训练完成，总耗时: {training_time:.2f} 秒")
     print(f"训练数据形状: {data_x_train.shape} (样本数, 时间步, 特征数)")

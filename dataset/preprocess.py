@@ -57,29 +57,20 @@ def preprocess_data(sample_size: int = 1000,
     数据预处理主函数
     """
     config = CONFIG.copy()
+    config["data"]["feature_selection"] = "top_k"
     config["data"]["top_k_features"] = feature_count
     config["data"]["window_size"] = window_size
-    
-    print(f"配置参数:")
-    print(f"  - 样本数量: {sample_size}")
-    print(f"  - 特征数量: {feature_count}")
-    print(f"  - 窗口大小: {window_size}")
-    print(f"  - 保存目录: {save_dir}")
-    
+
     # 创建保存目录
     data_dir = create_data_directory(save_dir)
     
-    # 加载原始数据
+    # 加载清理过后的parquet数据
     train_df, test_df = load_processed_data(config, use_cache=True)
-    print(f"原始训练数据大小: {train_df.shape}")
-    print(f"原始测试数据大小: {test_df.shape}")
-    
-    # 数据采样
+
+    # 数据采前sample_size个样本
     train_df_sample = train_df.head(sample_size)
     test_df_sample = test_df.head(test_sample_size)
-    print(f"采样后训练数据大小: {train_df_sample.shape}")
-    print(f"采样后测试数据大小: {test_df_sample.shape}")
-    
+
     # 特征选择
     feature_cols = select_features(train_df_sample, config)
     target_col = config["data"]["target_column"]
@@ -91,16 +82,15 @@ def preprocess_data(sample_size: int = 1000,
     data_x_test, _ = prepare_data_x(test_df_sample, window_size, feature_cols)
     data_y_test = prepare_data_y(test_df_sample, window_size, target_col)
     
-    print(f"输入数据形状: {data_x_train.shape}")  # (n_samples, window_size, n_features)
-    print(f"目标数据形状: {data_y_train.shape}")  # (n_samples,)
+    print(f"训练数据形状: {data_x_train.shape}")  # (n_samples, window_size, n_features)
+    print(f"训练目标数据形状: {data_y_train.shape}")  # (n_samples,)
     print(f"测试数据形状: {data_x_test.shape}")  # (n_samples, window_size, n_features)
     print(f"测试目标数据形状: {data_y_test.shape}")  # (n_samples,)
     
     # 数据标准化
     feature_scaler = Normalizer()
     target_scaler = Normalizer()
-    
-    # 重塑数据以进行标准化
+
     original_shape_train = data_x_train.shape
     original_shape_test = data_x_test.shape
     data_x_reshaped_train = data_x_train.reshape(-1, data_x_train.shape[-1])  # (n_samples * window_size, n_features)
@@ -109,7 +99,7 @@ def preprocess_data(sample_size: int = 1000,
     data_x_normalized_reshaped_test = feature_scaler.fit_transform(data_x_reshaped_test)
     data_x_normalized_train = data_x_normalized_reshaped_train.reshape(original_shape_train)
     data_x_normalized_test = data_x_normalized_reshaped_test.reshape(original_shape_test)
-    # 标准化目标数据
+
     data_y_normalized_train = target_scaler.fit_transform(data_y_train.reshape(-1, 1)).flatten()
     data_y_normalized_test = target_scaler.fit_transform(data_y_test.reshape(-1, 1)).flatten()
 
@@ -124,11 +114,7 @@ def preprocess_data(sample_size: int = 1000,
 
     data_x_test = data_x_normalized_test
     data_y_test = data_y_normalized_test
-    
-    print(f"训练集大小: {data_x_train.shape[0]}")
-    print(f"验证集大小: {data_x_val.shape[0]}")
-    print(f"测试集大小: {data_x_test.shape[0]}")
-    
+
     train_data = {
         'x': data_x_train,
         'y': data_y_train
@@ -224,7 +210,7 @@ def check_preprocessed_data_exists(data_dir: str = "data") -> bool:
 
 def load_preprocessed_data(data_dir: str = "data") -> dict:
     """
-    加载预处理后的数据
+    在主程序中加载预处理后的pickle数据
     """
     if not check_preprocessed_data_exists(data_dir):
         raise FileNotFoundError(f"请先运行数据预处理。")
@@ -241,12 +227,6 @@ def load_preprocessed_data(data_dir: str = "data") -> dict:
         scalers = pickle.load(f)
     with open(os.path.join(data_dir, 'metadata.pkl'), 'rb') as f:
         metadata = pickle.load(f)
-    
-    print("数据加载完成!")
-    print(f"  - 训练集: {train_data['x'].shape}")
-    print(f"  - 验证集: {val_data['x'].shape}")
-    print(f"  - 特征数: {metadata['feature_count']}")
-    print(f"  - 窗口大小: {metadata['window_size']}")
     
     return {
         'train_data': train_data,

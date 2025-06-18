@@ -13,26 +13,19 @@ def load_parquet_data(config):
     # 读取数据
     train_df = pd.read_parquet(config["data"]["train_path"])
     test_df = pd.read_parquet(config["data"]["test_path"])
-    
-    print(f"训练数据形状: {train_df.shape}")
-    print(f"测试数据形状: {test_df.shape}")
-    
+
     # 数据清洗和预处理
     train_cleaned = process_data(train_df)
     test_cleaned = process_data(test_df)
     
-    # 保存预处理后的数据
+    # 保存预处理后的parquet数据
     processed_dir = config["data"]["processed_dir"]
     os.makedirs(processed_dir, exist_ok=True)
-    
     train_processed_path = os.path.join(processed_dir, "train_processed.parquet")
     test_processed_path = os.path.join(processed_dir, "test_processed.parquet")
     
     train_cleaned.to_parquet(train_processed_path)
     test_cleaned.to_parquet(test_processed_path)
-    
-    print(f"预处理后的训练数据已保存到: {train_processed_path}")
-    print(f"预处理后的测试数据已保存到: {test_processed_path}")
     
     return train_cleaned, test_cleaned
 
@@ -40,8 +33,6 @@ def process_data(df):
     """
     数据清洗，处理缺失值和极端异常值
     """
-    print(f"开始数据预处理，原始数据形状: {df.shape}")
-
     df_processed = df.copy()
     
     # 检查和处理缺失值
@@ -97,13 +88,11 @@ def process_data(df):
         print(f"发现 {inf_count} 个无穷值，将其替换为0")
         df_processed = df_processed.replace([np.inf, -np.inf], 0)
     
-    print(f"数据预处理完成，处理后数据形状: {df_processed.shape}")
-    
     return df_processed
 
 def load_processed_data(config, use_cache=True):
     """
-    加载预处理后的数据，如果缓存存在且use_cache=True则直接加载缓存
+    加载清理后的parquet数据，用于在preprocess中保存为pickle
     """
     processed_dir = config["data"]["processed_dir"]
     train_processed_path = os.path.join(processed_dir, "train_processed.parquet")
@@ -114,8 +103,6 @@ def load_processed_data(config, use_cache=True):
         print("加载预处理后的缓存数据...")
         train_df = pd.read_parquet(train_processed_path)
         test_df = pd.read_parquet(test_processed_path)
-        print(f"训练数据形状: {train_df.shape}")
-        print(f"测试数据形状: {test_df.shape}")
         return train_df, test_df
     else:
         print("缓存不存在或选择重新处理，开始加载原始数据...")
