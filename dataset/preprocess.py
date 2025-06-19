@@ -19,9 +19,8 @@ def create_data_directory(data_dir: str = "data") -> str:
     """创建数据目录"""
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-        print(f"创建数据目录: {data_dir}")
+        # print(f"创建数据目录: {data_dir}")
     return data_dir
-
 
 
 def preprocess_data_with_feature_engineering(sample_size: int = 1000, 
@@ -35,28 +34,22 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
     实现三步数据处理流程：
     1. 初步数据清理（data_loader.process_data）
     2. 特征工程（feature_engineering）
-    3. 再次数据清理（data_loader中的清洗函数）
+    3. 再次数据清理
     """
     config = CONFIG.copy()
-    
-    # 启用特征工程配置
     config["feature_engineering"]["enable_feature_engineering"] = enable_feature_engineering
     config["data"]["window_size"] = window_size
 
-    # 创建保存目录
     data_dir = create_data_directory(save_dir)
     
-    # 第一步：加载原始数据并进行初步清理
     print("="*60)
     print("第一步：加载原始数据并进行初步清理")
     print("="*60)
     
     # 加载原始parquet数据
-    print("加载原始parquet数据...")
     train_df = pd.read_parquet(config["data"]["train_path"])
     test_df = pd.read_parquet(config["data"]["test_path"])
     
-    # 采样
     train_df_sample = train_df.head(sample_size)
     test_df_sample = test_df.head(test_sample_size)
 
@@ -77,21 +70,15 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
     
     target_col = config["data"]["target_column"]
     
-    # 第二步：特征工程
     print("\n" + "="*60)
     print("第二步：特征工程")
     print("="*60)
     
     if enable_feature_engineering:
-        print("开始应用特征工程...")
-        print(f"训练数据初步清理后形状: {train_df_basic.shape}")
-        print(f"测试数据初步清理后形状: {test_df_basic.shape}")
-        
         # 对训练数据应用特征工程
         train_df_enhanced, feature_engineering_info = apply_integrated_feature_engineering(
             train_df_basic, config, target_col
         )
-        
         # 对测试数据应用特征工程
         test_df_enhanced, _ = apply_integrated_feature_engineering(
             test_df_basic, config, target_col
@@ -103,16 +90,11 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
         # 确保两个数据集有相同的特征
         train_features = set(train_df_enhanced.columns)
         test_features = set(test_df_enhanced.columns)
-        
         common_features = list(train_features.intersection(test_features))
-        if target_col in common_features:
-            feature_cols = [col for col in common_features if col != target_col]
-        else:
-            raise ValueError(f"目标列 {target_col} 在处理后的数据中不存在！")
-        
-        print(f"共同特征数量: {len(feature_cols)}")
-        
-        # 保持特征对齐
+        feature_cols = [col for col in common_features if col != target_col]
+
+        print(f"共同特征数量: {len(feature_cols)}，这个数不包括目标列")
+        # 从训练集和测试集中仅保留共同的特征列 + 目标列，确保数据对齐
         train_df_processed = train_df_enhanced[feature_cols + [target_col]]
         test_df_processed = test_df_enhanced[feature_cols + [target_col]]
         
@@ -124,7 +106,7 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
         feature_engineering_info = {}
     
     print("\n" + "="*60)
-    print("第三步：时间序列窗口化和标准化")
+    print("第三步：时间序列窗口化")
     print("="*60)
     
     print(f"最终训练数据形状: {train_df_processed.shape}")
@@ -142,7 +124,6 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
     print(f"  训练X: {data_x_train.shape}, 训练Y: {data_y_train.shape}")
     print(f"  测试X: {data_x_test.shape}, 测试Y: {data_y_test.shape}")
     
-    # 第四步：数据标准化
     print(f"\n第四步：数据标准化...")
     feature_scaler = Normalizer()
     target_scaler = Normalizer()
@@ -164,7 +145,6 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
     data_y_normalized_train = target_scaler.fit_transform(data_y_train.reshape(-1, 1)).flatten()
     data_y_normalized_test = target_scaler.transform(data_y_test.reshape(-1, 1)).flatten()
 
-    # 第五步：分割数据集和保存
     print(f"\n第五步：数据分割和保存...")
     split_ratio = config["data"]["train_split_size"]
     split_index = int(data_y_normalized_train.shape[0] * split_ratio)
@@ -240,12 +220,6 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
             'feature_engineering_enabled': enable_feature_engineering
         }
     }
-    
-    print(f"\n{'='*60}")
-    print(f"数据预处理完成!")
-    print(f"保存目录: {data_dir}")
-    print(f"特征工程: {'启用' if enable_feature_engineering else '禁用'}")
-    print(f"最终特征数: {len(feature_cols)}")
     
     return summary
 

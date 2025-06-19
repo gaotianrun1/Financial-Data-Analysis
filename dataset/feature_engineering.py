@@ -39,9 +39,7 @@ class IntegratedFeatureEngineer:
         
     def apply_feature_engineering(self, df: pd.DataFrame, target_col: str = 'label') -> pd.DataFrame:
         """应用综合特征工程"""
-        print(f"开始应用量化金融特征工程...")
-        print(f"输入数据形状: {df.shape}")
-        
+
         original_features = df.shape[1]
         df_processed = df.copy()
         
@@ -74,7 +72,6 @@ class IntegratedFeatureEngineer:
             df_processed = self._add_interaction_features(df_processed)
         
         # 8. 特征工程后的数据清洗
-        print("\n特征工程完成，开始数据清洗...")
         df_processed = self._clean_engineered_features(df_processed, target_col)
         
         new_features = df_processed.shape[1] - original_features
@@ -86,13 +83,12 @@ class IntegratedFeatureEngineer:
         """
         使用data_loader中的清洗函数处理特征工程后的数据
         """
-        print("清理特征工程后的数据...")
         from .data_loader import handle_missing_values, handle_financial_outliers
         
         # 处理缺失值和无穷值
         df_clean, removed_features = handle_missing_values(
             df, 
-            missing_threshold=0.5,  # 对于特征工程后的数据，使用更宽松的阈值
+            missing_threshold=0.5,
             method='ffill'
         )
         
@@ -103,13 +99,11 @@ class IntegratedFeatureEngineer:
             window='1D',
             target_col=target_col
         )
-        
-        print(f"  数据清洗完成: {df.shape} -> {df_clean.shape}")
+
         return df_clean
     
     def _add_order_flow_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """添加订单流特征 - 量化交易的核心特征"""
-        print("添加订单流特征...")
+        """添加订单流特征"""
         df_enhanced = df.copy()
         
         # 基础订单流不平衡指标
@@ -153,12 +147,11 @@ class IntegratedFeatureEngineer:
                 f'order_flow_momentum_{window}', f'trade_flow_momentum_{window}'
             ])
         
-        print(f"    添加了 {len([f for f in self.order_flow_features if f in df_enhanced.columns])} 个订单流特征")
+        print(f"添加了 {len([f for f in self.order_flow_features if f in df_enhanced.columns])} 个订单流特征")
         return df_enhanced
     
     def _add_liquidity_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加流动性特征"""
-        print("  添加流动性特征...")
         df_enhanced = df.copy()
         
         # 流动性指标
@@ -203,7 +196,6 @@ class IntegratedFeatureEngineer:
     
     def _add_microstructure_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加市场微观结构特征"""
-        print("添加市场微观结构特征...")
         df_enhanced = df.copy()
         
         # 价格影响指标
@@ -246,12 +238,11 @@ class IntegratedFeatureEngineer:
                 f'avg_spread_proxy_{window}', f'avg_market_depth_{window}', f'avg_market_impact_{window}'
             ])
         
-        print(f"    添加了 {len([f for f in self.microstructure_features if f in df_enhanced.columns])} 个微观结构特征")
+        print(f"添加了 {len([f for f in self.microstructure_features if f in df_enhanced.columns])} 个微观结构特征")
         return df_enhanced
     
     def _add_pressure_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加买卖压力特征"""
-        print("  添加买卖压力特征...")
         df_enhanced = df.copy()
         
         # 买入压力指标
@@ -296,12 +287,11 @@ class IntegratedFeatureEngineer:
                 f'buy_pressure_volatility_{window}', f'sell_pressure_volatility_{window}'
             ])
         
-        print(f"    添加了 {len([f for f in self.pressure_features if f in df_enhanced.columns])} 个买卖压力特征")
+        print(f"添加了 {len([f for f in self.pressure_features if f in df_enhanced.columns])} 个买卖压力特征")
         return df_enhanced
 
     def _add_statistical_features(self, df: pd.DataFrame, target_col: str) -> pd.DataFrame:
         """添加统计特征"""
-        print("  添加统计特征...")
         df_enhanced = df.copy()
         
         # 基础市场数据列
@@ -365,9 +355,8 @@ class IntegratedFeatureEngineer:
     
     def _add_time_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加时间特征"""
-        print("  添加时间特征...")
         df_enhanced = df.copy()
-
+        # 似乎没看到休市，所以没加交易时段特征
         # 基础时间特征，捕捉交易时间的周期性规律
         df_enhanced['hour'] = df_enhanced.index.hour
         df_enhanced['minute'] = df_enhanced.index.minute
@@ -388,15 +377,12 @@ class IntegratedFeatureEngineer:
             
             cyclical_features = ['hour_sin', 'hour_cos', 'minute_sin', 'minute_cos', 'day_sin', 'day_cos']
             self.time_features.extend(cyclical_features)
-        
-        # 交易时段特征，似乎没看到休市
-        
+
         print(f"添加了 {len(self.time_features)} 个时间特征")
         return df_enhanced
     
     def _add_interaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加交互特征"""
-        print("  添加交互特征...")
         df_enhanced = df.copy()
         # 买卖量与流动性的交互
         df_enhanced['buy_liquidity_interaction'] = df['buy_qty'] * df['bid_qty']
@@ -421,7 +407,7 @@ class IntegratedFeatureEngineer:
             'volume_hour_interaction', 'order_flow_hour_interaction'
         ])
         
-        print(f"    添加了 {len([f for f in self.interaction_features if f in df_enhanced.columns])} 个交互特征")
+        print(f"添加了 {len([f for f in self.interaction_features if f in df_enhanced.columns])} 个交互特征")
         return df_enhanced
   
     def get_feature_summary(self) -> Dict:
@@ -451,25 +437,14 @@ class IntegratedFeatureEngineer:
             }
         }
 
-# 主函数
 def apply_integrated_feature_engineering(df: pd.DataFrame, config: Dict, target_col: str = 'label') -> Tuple[pd.DataFrame, Dict]:
     """
-    应用量化金融特征工程流程
-    
-    Args:
-        df: 输入数据
-        config: 配置字典
-        target_col: 目标列名
-        
-    Returns:
-        处理后的数据框和处理信息
+    应用量化金融特征工程全流程的主函数
     """
     engineer = IntegratedFeatureEngineer(config)
-    
-    # 特征工程
+
     df_processed = engineer.apply_feature_engineering(df, target_col)
     
-    # 整合信息
     processing_info = {
         'feature_summary': engineer.get_feature_summary(),
         'scalers': engineer.scalers,

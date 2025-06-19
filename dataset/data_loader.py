@@ -80,8 +80,6 @@ def handle_missing_values(df, missing_threshold=0.2, method='ffill'):
     # 处理剩余的缺失值（包括NaN和无穷值）
     remaining_missing = df_processed.isnull().sum().sum()
     if remaining_missing > 0:
-        print(f"发现 {remaining_missing} 个缺失值（含无穷值），使用{method}方法填充")
-        
         if method == 'ffill':
             df_processed = df_processed.fillna(method='ffill').fillna(method='bfill')
         elif method == 'bfill':
@@ -90,18 +88,6 @@ def handle_missing_values(df, missing_threshold=0.2, method='ffill'):
             numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
             df_processed[numeric_cols] = df_processed[numeric_cols].interpolate(method='linear')
             df_processed = df_processed.fillna(method='ffill').fillna(method='bfill')
-        
-        # 验证是否还有缺失值
-        final_missing = df_processed.isnull().sum().sum()
-        if final_missing > 0:
-            print(f"警告：仍有 {final_missing} 个缺失值，使用0填充")
-            df_processed = df_processed.fillna(0)
-    
-    # 最终检查，确保没有无穷值
-    final_inf_count = np.isinf(df_processed.select_dtypes(include=[np.number])).sum().sum()
-    if final_inf_count > 0:
-        print(f"警告：仍有 {final_inf_count} 个无穷值，使用0填充")
-        df_processed = df_processed.replace([np.inf, -np.inf], 0)
     
     print(f"缺失值和无穷值处理完成，保留特征数: {df_processed.shape[1]}")
     return df_processed, features_to_remove
@@ -123,25 +109,23 @@ def remove_low_variance_features(df, variance_threshold=1e-6, target_col='label'
     
     protected_features = ["bid_qty", "ask_qty", "buy_qty", "sell_qty", "volume", "label"]
     
-    # 获取数值特征列（排除目标列）
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if target_col in numeric_cols:
         feature_cols = [col for col in numeric_cols if col != target_col]
     else:
         feature_cols = numeric_cols
     
-    # 计算方差
+    # 计算方差，找出低方差特征
     variances = df[feature_cols].var()
     
-    # 找出低方差特征
     low_variance_features_candidates = variances[variances <= variance_threshold].index.tolist()
     low_variance_features = [f for f in low_variance_features_candidates if f not in protected_features]
 
     if low_variance_features:
-        print(f"删除方差<={variance_threshold}的特征: {len(low_variance_features)}个")
+        # print(f"删除方差<={variance_threshold}的特征: {len(low_variance_features)}个")
         df_filtered = df.drop(columns=low_variance_features)
     else:
-        print("未发现需要删除的低方差特征")
+        # print("未发现需要删除的低方差特征")
         df_filtered = df.copy()
         
     print(f"方差过滤完成，保留特征数: {df_filtered.shape[1]}")
@@ -193,10 +177,10 @@ def remove_highly_correlated_features(df, correlation_threshold=0.95, target_col
     removed_features = [f for f in removed_features_candidates if f not in protected_features]
     
     if removed_features:
-        print(f"删除相关系数>{correlation_threshold}的特征: {len(removed_features)}个")
+        # print(f"删除相关系数>{correlation_threshold}的特征: {len(removed_features)}个")
         df_filtered = df.drop(columns=removed_features)
     else:
-        print("未发现需要删除的高度相关特征")
+        # print("未发现需要删除的高度相关特征")
         df_filtered = df.copy()
     
     print(f"相关性过滤完成，保留特征数: {df_filtered.shape[1]}")
@@ -220,11 +204,7 @@ def select_features_by_target_correlation(df, target_col='label', keep_ratio=0.7
     """
     print(f"=== 基于与目标变量相关性的特征选择 (保留{keep_ratio:.1%}) ===")
     protected_features = ["bid_qty", "ask_qty", "buy_qty", "sell_qty", "volume", "label"]
-    
-    if target_col not in df.columns:
-        print(f"警告：目标列 '{target_col}' 不存在，跳过特征选择")
-        return df.copy(), df.columns.tolist(), {}
-    
+
     # 获取特征列
     feature_cols = [col for col in df.columns if col != target_col]
     X = df[feature_cols]
@@ -270,12 +250,11 @@ def select_features_by_target_correlation(df, target_col='label', keep_ratio=0.7
     else:  # both
         corr_scores = pd.Series(feature_scores['correlation'])
         mi_scores = pd.Series(feature_scores['mutual_info'])
-        # 归一化到[0,1]区间
-        corr_scores_norm = (corr_scores - corr_scores.min()) / (corr_scores.max() - corr_scores.min())
+        
+        corr_scores_norm = (corr_scores - corr_scores.min()) / (corr_scores.max() - corr_scores.min()) # 归一化到[0,1]区间
         mi_scores_norm = (mi_scores - mi_scores.min()) / (mi_scores.max() - mi_scores.min())
         
-        # 加权平均
-        final_scores = (0.5 * corr_scores_norm + 0.5 * mi_scores_norm).to_dict()
+        final_scores = (0.5 * corr_scores_norm + 0.5 * mi_scores_norm).to_dict() # 加权平均
     
     # 根据得分排序并选择top特征
     sorted_features = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
@@ -287,10 +266,7 @@ def select_features_by_target_correlation(df, target_col='label', keep_ratio=0.7
         if pf not in selected_features:
             selected_features.append(pf)
     
-    print(f"特征选择完成:")
-    print(f"  - 原始特征数: {len(feature_cols)}")
-    print(f"  - 保留特征数: {len(selected_features)-1}")  # 减1是因为不计算目标列
-    print(f"  - 删除特征数: {len(feature_cols) - (len(selected_features)-1)}")
+    print(f"特征选择完成: 保留特征数: {len(selected_features)-1}")
 
     df_selected = df[selected_features]
     return df_selected, selected_features, feature_scores
@@ -309,7 +285,7 @@ def handle_financial_outliers(df, method='iqr', window='1D', target_col='label')
         df_processed: 处理后的DataFrame
         outlier_info: 异常值处理信息
     """
-    print(f"=== 金融数据异常值处理 (方法: {method}, 窗口: {window}) ===")
+    print(f"=== 异常值处理 (方法: {method}, 窗口: {window}) ===")
     
     df_processed = df.copy()
 
@@ -389,10 +365,7 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
         df_processed: 处理后的DataFrame
         preprocessing_info: 预处理信息字典（仅训练数据返回）
     """
-    print(f"\n{'='*50}")
     print(f"开始{'训练' if is_training_data else '测试'}数据预处理...")
-    print(f"输入数据形状: {df.shape}")
-    print(f"{'='*50}")
     
     df_processed = df.copy()
     
