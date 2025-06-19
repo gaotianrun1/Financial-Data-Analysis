@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 def load_parquet_data(config):
     """
-    加载本地parquet数据文件，进行数据清洗和预处理
+    加载本地parquet数据文件，进行数据清洗和预处理(现在只用在无特征工程版本了)
     """
     print("Loading data from parquet files...")
     train_df = pd.read_parquet(config["data"]["train_path"])
@@ -478,7 +478,7 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
         else:
             raise ValueError("测试数据中没有任何训练数据中选择的特征！")
     
-    # 5. 处理异常值（金融数据专用方法）
+    # 5. 处理异常值
     df_processed, outlier_info = handle_financial_outliers(
         df_processed,
         method=processing_config.get("outlier_method", "iqr"),

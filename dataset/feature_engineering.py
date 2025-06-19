@@ -38,33 +38,25 @@ class IntegratedFeatureEngineer:
         self.processing_stats = {}
         
     def apply_feature_engineering(self, df: pd.DataFrame, target_col: str = 'label') -> pd.DataFrame:
-        """
-        应用完整的特征工程流程
+        """应用综合特征工程"""
+        print(f"开始应用量化金融特征工程...")
+        print(f"输入数据形状: {df.shape}")
         
-        Args:
-            df: 输入数据框，包含bid_qty, ask_qty, buy_qty, sell_qty, volume, X_1-X_890
-            target_col: 目标列名
-            
-        Returns:
-            特征工程后的数据框
-        """
+        original_features = df.shape[1]
         df_processed = df.copy()
         
-        print("开始应用量化金融特征工程...")
-        original_features = df_processed.shape[1]
-        
-        # 1. 订单流特征 - 核心量化特征
+        # 1. 订单流特征
         if self.feature_engineer_config.get('enable_order_flow_features', True):
             df_processed = self._add_order_flow_features(df_processed)
-            
+        
         # 2. 流动性特征
         if self.feature_engineer_config.get('enable_liquidity_features', True):
             df_processed = self._add_liquidity_features(df_processed)
-            
+        
         # 3. 微观结构特征
         if self.feature_engineer_config.get('enable_microstructure_features', True):
             df_processed = self._add_microstructure_features(df_processed)
-            
+        
         # 4. 买卖压力特征
         if self.feature_engineer_config.get('enable_pressure_features', True):
             df_processed = self._add_pressure_features(df_processed)
@@ -72,19 +64,48 @@ class IntegratedFeatureEngineer:
         # 5. 统计特征
         if self.feature_engineer_config.get('enable_statistical_features', True):
             df_processed = self._add_statistical_features(df_processed, target_col)
-            
+        
         # 6. 时间特征
         if self.feature_engineer_config.get('enable_time_features', True):
             df_processed = self._add_time_features(df_processed)
-            
+        
         # 7. 交互特征
         if self.feature_engineer_config.get('enable_interaction_features', True):
             df_processed = self._add_interaction_features(df_processed)
-
+        
+        # 8. 特征工程后的数据清洗
+        print("\n特征工程完成，开始数据清洗...")
+        df_processed = self._clean_engineered_features(df_processed, target_col)
+        
         new_features = df_processed.shape[1] - original_features
         print(f"特征工程完成: 原始{original_features}个特征 -> 现在{df_processed.shape[1]}个特征 (新增{new_features}个)")
         
         return df_processed
+    
+    def _clean_engineered_features(self, df: pd.DataFrame, target_col: str = 'label') -> pd.DataFrame:
+        """
+        使用data_loader中的清洗函数处理特征工程后的数据
+        """
+        print("清理特征工程后的数据...")
+        from .data_loader import handle_missing_values, handle_financial_outliers
+        
+        # 处理缺失值和无穷值
+        df_clean, removed_features = handle_missing_values(
+            df, 
+            missing_threshold=0.5,  # 对于特征工程后的数据，使用更宽松的阈值
+            method='ffill'
+        )
+        
+        # 处理异常值
+        df_clean, outlier_info = handle_financial_outliers(
+            df_clean,
+            method='iqr',
+            window='1D',
+            target_col=target_col
+        )
+        
+        print(f"  数据清洗完成: {df.shape} -> {df_clean.shape}")
+        return df_clean
     
     def _add_order_flow_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加订单流特征 - 量化交易的核心特征"""
