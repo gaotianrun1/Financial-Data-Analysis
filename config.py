@@ -9,26 +9,19 @@ CONFIG = {
         # 数据源设置
         "data_source": "parquet",  # "alpha_vantage" 或 "parquet"
         "train_path": "/ssdwork/gaotianrun/findataset/train.parquet",
-        "test_path": "/ssdwork/gaotianrun/findataset/test.parquet",
+        "test_path": "/ssdwork/gaotianrun/findataset/test_converted.parquet",
         "processed_dir": "data/processed_data",
 
         # 数据采样
-        "sample_size": 10000,
-        "test_sample_size": 2000,
+        "sample_size": 50000,
+        "test_sample_size": 10000,
         
         # 特征设置
         "target_column": "label",
-        "feature_selection": "top_k",  # "all", "top_k", 或指定特征列表
-        "top_k_features": 50,  # 当feature_selection="top_k"时使用
         
         # 时间序列设置
         "window_size": 20,
         "train_split_size": 0.90,
-        
-        # 数据预处理设置
-        "handle_outliers": True,
-        "outlier_method": "iqr",  # "iqr", "zscore"
-        "add_time_features": True,
     },
     "data_processing": {
         # 缺失值处理
@@ -40,14 +33,53 @@ CONFIG = {
         
         # 相关性过滤
         "correlation_threshold": 0.95,    # 相关系数阈值，高于此值的特征对将删除其中一个
+        "correlation_sample_size": 10000, # 计算相关性矩阵时的采样数量
         
         # 基于标签的特征选择
         "feature_selection_method": "both",  # 'correlation', 'mutual_info', 'both'
         "feature_keep_ratio": 0.3,          # 保留特征的比例（删除70%最没价值的特征）
+        "mutual_info_sample_size": 20000,   # 计算互信息时的采样数量
         
-        # 异常值处理
-        "outlier_method": "clip",            # 'clip' 截断, 'remove' 删除
-        "outlier_std_threshold": 3,          # 标准差阈值
+        # 数据异常值处理
+        "outlier_method": "iqr",             # 'iqr', 'quantile', 'zscore'
+        "outlier_window": "1D",              # 时间窗口大小 "1D", "1H", "15min", "5min"
+        "protected_features": ["bid_qty", "ask_qty", "buy_qty", "sell_qty", "volume", "label"]
+    },
+    # 量化金融特征工程配置
+    "feature_engineering": {
+        # 特征工程开关
+        "enable_feature_engineering": True,
+        "enable_order_flow_features": True,      # 启用订单流特征
+        "enable_liquidity_features": True,       # 启用流动性特征
+        "enable_microstructure_features": True,  # 启用微观结构特征
+        "enable_pressure_features": True,        # 启用买卖压力特征
+        "enable_statistical_features": True,     # 启用统计特征
+        "enable_time_features": True,           # 启用时间特征
+        "enable_interaction_features": True,     # 启用交互特征
+        
+        # 订单流特征配置
+        "order_flow_windows": [5, 10, 20],       # 订单流滚动窗口
+        
+        # 流动性特征配置
+        "liquidity_windows": [5, 10, 20],        # 流动性特征滚动窗口
+        
+        # 微观结构特征配置
+        "microstructure_windows": [5, 10, 20],   # 微观结构特征滚动窗口
+        # 买卖压力特征配置
+        "pressure_windows": [5, 10, 20],         # 压力特征滚动窗口
+        
+        # 统计特征配置
+        "statistical_windows": [5, 10, 20],      # 统计特征窗口
+        "lag_periods": [1, 2, 3, 5, 10],        # 滞后期
+        "rolling_operations": ["mean", "std", "max", "min"], # 滚动统计操作
+        
+        # 时间特征配置
+        "enable_cyclical_encoding": True,        # 启用周期性编码
+        
+        # 交互特征配置
+        "enable_time_interactions": True,        # 启用时间交互特征
+        "enable_volume_interactions": True,      # 启用成交量交互特征
+        "enable_pressure_interactions": True,    # 启用压力交互特征
     },
     "plots": {
         "xticks_interval": 90, # show a date every 90 days

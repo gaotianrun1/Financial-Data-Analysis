@@ -1,7 +1,7 @@
 """
 数据预处理模块
-负责加载原始parquet数据，进行预处理，并保存为可直接用于训练的格式
-python -m dataset.preprocess
+负责加载原始parquet数据，进行预处理和特征工程，并保存为可直接用于训练的格式
+python -m dataset.preprocess --enable_feature_engineering
 """
 
 import numpy as np
@@ -10,6 +10,7 @@ import os
 import pickle
 from typing import Tuple, List
 from .data_loader import load_processed_data, prepare_data_x, prepare_data_y
+from .feature_engineering import apply_integrated_feature_engineering
 from utils.normalizer import Normalizer
 from config import CONFIG
 import argparse
@@ -21,44 +22,223 @@ def create_data_directory(data_dir: str = "data") -> str:
         print(f"创建数据目录: {data_dir}")
     return data_dir
 
-def select_features(train_df: pd.DataFrame, config: dict) -> List[str]:
+
+
+def preprocess_data_with_feature_engineering(sample_size: int = 1000, 
+                                            window_size: int = 10,
+                                            test_sample_size: int = 200,
+                                            save_dir: str = "data",
+                                            enable_feature_engineering: bool = True) -> dict:
     """
-    特征选择
+    集成特征工程的数据预处理主函数
     """
-    # 确定特征列
-    all_feature_cols = [col for col in train_df.columns if col != config["data"]["target_column"]]
+    config = CONFIG.copy()
+    
+    # 启用特征工程配置
+    config["feature_engineering"]["enable_feature_engineering"] = enable_feature_engineering
+    config["data"]["window_size"] = window_size
+
+    # 创建保存目录
+    data_dir = create_data_directory(save_dir)
+    
+    # 第一步：加载原始parquet数据，并进行基础清洗预处理
+    print("第一步：基础数据清洗和预处理...")
+    from .data_loader import load_parquet_data
+    train_df_basic, test_df_basic = load_parquet_data(config)
+
+    train_df_sample = train_df_basic
+    test_df_sample = test_df_basic
+    
     target_col = config["data"]["target_column"]
     
-    # 特征选择
-    if config["data"]["feature_selection"] == "all":
-        feature_cols = all_feature_cols
-        print(f"使用所有 {len(feature_cols)} 个特征")
-    elif config["data"]["feature_selection"] == "top_k":
-        # 基于与目标变量的相关性选择top_k特征
-        print("正在计算特征相关性...")
-        correlations = train_df[all_feature_cols].corrwith(train_df[target_col]).abs()
-        top_features = correlations.nlargest(config["data"]["top_k_features"]).index.tolist()
-        feature_cols = top_features
-        print(f"选择了前 {len(feature_cols)} 个最相关的特征")
-        print(f"选择的特征: {feature_cols}")
-    else:
-        # 自定义特征列表
-        feature_cols = config["data"]["feature_selection"]
-        print(f"使用自定义特征: {len(feature_cols)} 个")
+    print(f"\n第二步：特征工程处理...")
+    print(f"训练数据基础预处理后形状: {train_df_sample.shape}")
+    print(f"测试数据基础预处理后形状: {test_df_sample.shape}")
     
-    return feature_cols
+    # 第二步：应用特征工程
+    if enable_feature_engineering:
+        print("开始应用特征工程...")
+        
+        # 对训练数据应用完整的特征工程（包括特征选择）
+        train_df_enhanced, feature_engineering_info = apply_integrated_feature_engineering(
+            train_df_sample, config, target_col
+        )
+        
+        # 获取训练数据中选择的特征
+        if 'preprocessing_info' in feature_engineering_info and 'feature_selection' in feature_engineering_info['preprocessing_info']:
+            selected_features = feature_engineering_info['preprocessing_info']['feature_selection']['selected_feature_names']
+        else:
+            # 如果没有特征选择信息，使用所有非目标特征
+            selected_features = [col for col in train_df_enhanced.columns if col != target_col]
+        
+        print(f"训练数据特征工程完成，选择了 {len(selected_features)} 个特征")
+        
+        # 对测试数据应用特征工程，但使用训练数据的特征选择结果
+        print("对测试数据应用特征工程...")
+        
+        # 复制配置，用于测试数据（测试数据使用训练数据的特征选择结果）
+        config_test = config.copy()
+        
+        # 对测试数据应用特征工程（不包括特征选择步骤）
+        test_df_enhanced, _ = apply_integrated_feature_engineering(
+            test_df_sample, config_test, target_col
+        )
+        
+        # 确保测试数据包含训练数据中选择的特征
+        available_features = [col for col in selected_features if col in test_df_enhanced.columns]
+        missing_features = set(selected_features) - set(test_df_enhanced.columns)
+        
+        if missing_features:
+            print(f"警告: 测试数据中缺少 {len(missing_features)} 个特征: {list(missing_features)[:5]}...")
+        
+        print(f"测试数据中可用特征: {len(available_features)}/{len(selected_features)}")
+        
+        # 对齐特征：只保留两个数据集都有的特征
+        common_features = available_features
+        if target_col in train_df_enhanced.columns and target_col in test_df_enhanced.columns:
+            train_df_processed = train_df_enhanced[common_features + [target_col]]
+            test_df_processed = test_df_enhanced[common_features + [target_col]]
+        else:
+            raise ValueError(f"目标列 {target_col} 在处理后的数据中不存在！")
+        
+        feature_cols = common_features
+        
+    else:
+        # 使用传统预处理（不应用特征工程）
+        print("使用传统预处理方法...")
+        train_df_processed = train_df_sample
+        test_df_processed = test_df_sample
+        feature_cols = [col for col in train_df_sample.columns if col != target_col]
+        feature_engineering_info = {}
+    
+    print(f"\n第三步：时间序列窗口化...")
+    print(f"处理后训练数据形状: {train_df_processed.shape}")
+    print(f"处理后测试数据形状: {test_df_processed.shape}")
+    print(f"特征数量: {len(feature_cols)}")
+    
+    # 第三步：准备时间序列窗口数据
+    data_x_train, _ = prepare_data_x(train_df_processed, window_size, feature_cols)
+    data_y_train = prepare_data_y(train_df_processed, window_size, target_col)
+
+    data_x_test, _ = prepare_data_x(test_df_processed, window_size, feature_cols)
+    data_y_test = prepare_data_y(test_df_processed, window_size, target_col)
+    
+    print(f"时间序列数据形状:")
+    print(f"  训练X: {data_x_train.shape}, 训练Y: {data_y_train.shape}")
+    print(f"  测试X: {data_x_test.shape}, 测试Y: {data_y_test.shape}")
+    
+    # 第四步：数据标准化
+    print(f"\n第四步：数据标准化...")
+    feature_scaler = Normalizer()
+    target_scaler = Normalizer()
+
+    # 特征标准化
+    original_shape_train = data_x_train.shape
+    original_shape_test = data_x_test.shape
+    
+    data_x_reshaped_train = data_x_train.reshape(-1, data_x_train.shape[-1])
+    data_x_reshaped_test = data_x_test.reshape(-1, data_x_test.shape[-1])
+    
+    data_x_normalized_reshaped_train = feature_scaler.fit_transform(data_x_reshaped_train)
+    data_x_normalized_reshaped_test = feature_scaler.transform(data_x_reshaped_test)
+    
+    data_x_normalized_train = data_x_normalized_reshaped_train.reshape(original_shape_train)
+    data_x_normalized_test = data_x_normalized_reshaped_test.reshape(original_shape_test)
+
+    # 目标变量标准化
+    data_y_normalized_train = target_scaler.fit_transform(data_y_train.reshape(-1, 1)).flatten()
+    data_y_normalized_test = target_scaler.transform(data_y_test.reshape(-1, 1)).flatten()
+
+    # 第五步：分割数据集和保存
+    print(f"\n第五步：数据分割和保存...")
+    split_ratio = config["data"]["train_split_size"]
+    split_index = int(data_y_normalized_train.shape[0] * split_ratio)
+    
+    data_x_train_final = data_x_normalized_train[:split_index]
+    data_x_val = data_x_normalized_train[split_index:]
+    data_y_train_final = data_y_normalized_train[:split_index]
+    data_y_val = data_y_normalized_train[split_index:]
+
+    # 构建返回数据
+    train_data = {'x': data_x_train_final, 'y': data_y_train_final}
+    val_data = {'x': data_x_val, 'y': data_y_val}
+    test_data = {'x': data_x_normalized_test, 'y': data_y_normalized_test}
+    
+    scalers = {
+        'feature_scaler': feature_scaler,
+        'target_scaler': target_scaler
+    }
+    
+    metadata = {
+        'feature_cols': feature_cols,
+        'target_col': target_col,
+        'window_size': window_size,
+        'sample_size': sample_size,
+        'feature_count': len(feature_cols),
+        'feature_engineering_enabled': enable_feature_engineering,
+        'original_data_shape': train_df_sample.shape,
+        'processed_data_shapes': {
+            'train_x': data_x_train_final.shape,
+            'train_y': data_y_train_final.shape,
+            'val_x': data_x_val.shape,
+            'val_y': data_y_val.shape,
+            'test_x': data_x_normalized_test.shape,
+            'test_y': data_y_normalized_test.shape
+        },
+        'split_ratio': split_ratio,
+        'config': config
+    }
+    
+    if enable_feature_engineering:
+        metadata['feature_engineering_info'] = feature_engineering_info
+    
+    # 保存数据
+    files_saved = []
+    save_files = {
+        'train_data.pkl': train_data,
+        'val_data.pkl': val_data,
+        'test_data.pkl': test_data,
+        'scalers.pkl': scalers,
+        'metadata.pkl': metadata
+    }
+    
+    for filename, data in save_files.items():
+        with open(os.path.join(data_dir, filename), 'wb') as f:
+            pickle.dump(data, f)
+        files_saved.append(filename)
+    
+    summary = {
+        'success': True,
+        'save_dir': data_dir,
+        'files_saved': files_saved,
+        'metadata': metadata,
+        'summary_stats': {
+            'original_samples': len(train_df_sample) + len(test_df_sample),
+            'train_samples': len(data_y_train_final),
+            'val_samples': len(data_y_val),
+            'test_samples': len(data_y_normalized_test),
+            'features_selected': len(feature_cols),
+            'window_size': window_size,
+            'feature_engineering_enabled': enable_feature_engineering
+        }
+    }
+    
+    print(f"\n{'='*60}")
+    print(f"数据预处理完成!")
+    print(f"保存目录: {data_dir}")
+    print(f"特征工程: {'启用' if enable_feature_engineering else '禁用'}")
+    print(f"最终特征数: {len(feature_cols)}")
+    
+    return summary
 
 def preprocess_data(sample_size: int = 1000, 
-                   feature_count: int = 10, 
                    window_size: int = 10,
                    test_sample_size: int = 200,
                    save_dir: str = "data") -> dict:
     """
-    数据预处理主函数
+    传统数据预处理主函数（保持向后兼容）
     """
     config = CONFIG.copy()
-    config["data"]["feature_selection"] = "all" # top_k
-    config["data"]["top_k_features"] = feature_count
     config["data"]["window_size"] = window_size
 
     # 创建保存目录
@@ -71,9 +251,28 @@ def preprocess_data(sample_size: int = 1000,
     train_df_sample = train_df.head(sample_size)
     test_df_sample = test_df.head(test_sample_size)
 
-    # 特征选择
-    feature_cols = select_features(train_df_sample, config)
+    # 获取特征列（应该来自预处理后的数据）
     target_col = config["data"]["target_column"]
+    
+    # 确保训练和测试数据具有相同的特征列（除了目标列）
+    train_feature_cols = [col for col in train_df_sample.columns if col != target_col]
+    test_feature_cols = [col for col in test_df_sample.columns if col != target_col]
+    
+    # 取交集确保特征一致性
+    common_feature_cols = list(set(train_feature_cols) & set(test_feature_cols))
+    
+    print(f"训练数据特征数: {len(train_feature_cols)}")
+    print(f"测试数据特征数: {len(test_feature_cols)}")
+    print(f"共同特征数: {len(common_feature_cols)}")
+    
+    if len(common_feature_cols) == 0:
+        raise ValueError("训练数据和测试数据没有共同的特征！")
+    
+    feature_cols = common_feature_cols
+        
+    # # 确保测试数据也只包含选择的特征
+    # train_df_sample = train_df_sample[feature_cols + [target_col]]
+    # test_df_sample = test_df_sample[feature_cols + [target_col]]
     
     # 准备时间序列窗口数据
     data_x_train, _ = prepare_data_x(train_df_sample, window_size, feature_cols)
@@ -87,21 +286,28 @@ def preprocess_data(sample_size: int = 1000,
     print(f"测试数据形状: {data_x_test.shape}")  # (n_samples, window_size, n_features)
     print(f"测试目标数据形状: {data_y_test.shape}")  # (n_samples,)
     
-    # 数据标准化
+    # 数据标准化 - 只在训练数据上fit，然后transform测试数据
     feature_scaler = Normalizer()
     target_scaler = Normalizer()
 
     original_shape_train = data_x_train.shape
     original_shape_test = data_x_test.shape
+    
+    # 特征标准化：在训练数据上fit，然后分别transform训练和测试数据
     data_x_reshaped_train = data_x_train.reshape(-1, data_x_train.shape[-1])  # (n_samples * window_size, n_features)
     data_x_reshaped_test = data_x_test.reshape(-1, data_x_test.shape[-1])  # (n_samples * window_size, n_features)
+    
+    # 在训练数据上fit并transform
     data_x_normalized_reshaped_train = feature_scaler.fit_transform(data_x_reshaped_train)
-    data_x_normalized_reshaped_test = feature_scaler.fit_transform(data_x_reshaped_test)
+    # 使用训练数据的统计信息transform测试数据
+    data_x_normalized_reshaped_test = feature_scaler.transform(data_x_reshaped_test)
+    
     data_x_normalized_train = data_x_normalized_reshaped_train.reshape(original_shape_train)
     data_x_normalized_test = data_x_normalized_reshaped_test.reshape(original_shape_test)
 
+    # 目标变量标准化：在训练数据上fit，然后分别transform训练和测试数据
     data_y_normalized_train = target_scaler.fit_transform(data_y_train.reshape(-1, 1)).flatten()
-    data_y_normalized_test = target_scaler.fit_transform(data_y_test.reshape(-1, 1)).flatten()
+    data_y_normalized_test = target_scaler.transform(data_y_test.reshape(-1, 1)).flatten()
 
     # 分割数据集
     split_ratio = config["data"]["train_split_size"]
@@ -238,19 +444,30 @@ if __name__ == "__main__":
     config0 = CONFIG.copy()
     parser = argparse.ArgumentParser(description='数据预处理脚本')
     parser.add_argument('--sample_size', type=int, default=config0["data"]["sample_size"], help='使用的样本数量')
-    parser.add_argument('--feature_count', type=int, default=30, help='使用的特征数量')
     parser.add_argument('--window_size', type=int, default=60, help='时间窗口大小')
     parser.add_argument('--test_sample_size', type=int, default=config0["data"]["test_sample_size"], help='测试样本数量')
     parser.add_argument('--save_dir', type=str, default='data', help='保存目录')
+    parser.add_argument('--use_traditional', action='store_true', help='使用传统预处理方法')
+    parser.add_argument('--enable_feature_engineering', action='store_true', help='启用特征工程（仅非传统模式）')
     
     args = parser.parse_args()
     
-    summary = preprocess_data(
-        sample_size=args.sample_size,
-        feature_count=args.feature_count,
-        window_size=args.window_size,
-        test_sample_size=args.test_sample_size,
-        save_dir=args.save_dir
-    )
-
-    print("数据预处理成功完成!")
+    if args.use_traditional:
+        summary = preprocess_data(
+            sample_size=args.sample_size,
+            window_size=args.window_size,
+            test_sample_size=args.test_sample_size,
+            save_dir=args.save_dir
+        )
+        print("传统数据预处理成功完成!")
+    else:
+        summary = preprocess_data_with_feature_engineering(
+            sample_size=args.sample_size,
+            window_size=args.window_size,
+            test_sample_size=args.test_sample_size,
+            save_dir=args.save_dir,
+            enable_feature_engineering=args.enable_feature_engineering
+        )
+        print("量化金融背景下的特征工程数据预处理成功完成!")
+    
+    print(f"处理结果: {summary['summary_stats']}")
