@@ -3,7 +3,6 @@
 from .evaluator import (
     evaluate_model_performance,
     save_evaluation_results,
-    compare_predictions,
     calculate_metrics,
     print_metrics
 )

@@ -57,7 +57,7 @@ def preprocess_data(sample_size: int = 1000,
     数据预处理主函数
     """
     config = CONFIG.copy()
-    config["data"]["feature_selection"] = "top_k"
+    config["data"]["feature_selection"] = "all" # top_k
     config["data"]["top_k_features"] = feature_count
     config["data"]["window_size"] = window_size
 
@@ -215,8 +215,6 @@ def load_preprocessed_data(data_dir: str = "data") -> dict:
     if not check_preprocessed_data_exists(data_dir):
         raise FileNotFoundError(f"请先运行数据预处理。")
     
-    print(f"从 {data_dir} 加载预处理数据...")
-
     with open(os.path.join(data_dir, 'train_data.pkl'), 'rb') as f:
         train_data = pickle.load(f)
     with open(os.path.join(data_dir, 'val_data.pkl'), 'rb') as f:
@@ -237,11 +235,12 @@ def load_preprocessed_data(data_dir: str = "data") -> dict:
     }
 
 if __name__ == "__main__":
+    config0 = CONFIG.copy()
     parser = argparse.ArgumentParser(description='数据预处理脚本')
-    parser.add_argument('--sample_size', type=int, default=10000, help='使用的样本数量')
+    parser.add_argument('--sample_size', type=int, default=config0["data"]["sample_size"], help='使用的样本数量')
     parser.add_argument('--feature_count', type=int, default=30, help='使用的特征数量')
-    parser.add_argument('--window_size', type=int, default=20, help='时间窗口大小')
-    parser.add_argument('--test_sample_size', type=int, default=2000, help='测试样本数量')
+    parser.add_argument('--window_size', type=int, default=60, help='时间窗口大小')
+    parser.add_argument('--test_sample_size', type=int, default=config0["data"]["test_sample_size"], help='测试样本数量')
     parser.add_argument('--save_dir', type=str, default='data', help='保存目录')
     
     args = parser.parse_args()

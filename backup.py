@@ -13,7 +13,6 @@ from config import CONFIG
 from postprocess.evaluator import evaluate_model_performance, save_evaluation_results
 from postprocess.visualizer import create_comprehensive_plots
 from datetime import datetime
-import pickle
 
 def select_device():
     if torch.cuda.is_available():
@@ -36,23 +35,30 @@ def main():
     else:
         print("找到预处理数据，正在加载...")
     
-    data_dict = load_preprocessed_data(DATA_DIR)
-    train_data = data_dict['train_data']
-    val_data = data_dict['val_data']
-    test_data = data_dict['test_data']
-    scalers = data_dict['scalers']
-    metadata = data_dict['metadata']
+    # 加载预处理数据
+    try:
+        data_dict = load_preprocessed_data(DATA_DIR)
+        train_data = data_dict['train_data']
+        val_data = data_dict['val_data']
+        test_data = data_dict['test_data']
+        scalers = data_dict['scalers']
+        metadata = data_dict['metadata']
 
-    data_x_train = train_data['x']
-    data_y_train = train_data['y']
-    data_x_val = val_data['x']
-    data_y_val = val_data['y']
-    data_x_test = test_data['x']
-    data_y_test = test_data['y']
-    
-    feature_scaler = scalers['feature_scaler']
-    target_scaler = scalers['target_scaler']
-    print("数据加载成功!")
+        data_x_train = train_data['x']
+        data_y_train = train_data['y']
+        data_x_val = val_data['x']
+        data_y_val = val_data['y']
+        data_x_test = test_data['x']
+        data_y_test = test_data['y']
+        
+        feature_scaler = scalers['feature_scaler']
+        target_scaler = scalers['target_scaler']
+        
+        print("数据加载成功!")
+        
+    except Exception as e:
+        print(f"数据加载失败: {e}")
+        return
     
     # 创建数据集
     dataset_train = TimeSeriesDataset(data_x_train, data_y_train)
@@ -60,8 +66,6 @@ def main():
     
     config["data"]["window_size"] = metadata["window_size"]
     config["model"]["input_size"] = metadata["feature_count"]
-    config["training"]["num_epoch"] = 100
-    config["training"]["batch_size"] = 512
     
     print(f"\n=== 模型配置 ===")
     print(f"输入维度: {config['model']['input_size']}")
@@ -72,14 +76,17 @@ def main():
     # 创建模型
     model = LSTMModel(
         input_size=config["model"]["input_size"], 
-        hidden_layer_size=128,  # 减少隐藏层大小以加快训练
-        num_layers=2,          # 减少LSTM层数
+        hidden_layer_size=config["model"]["lstm_size"],  # 减少隐藏层大小以加快训练
+        num_layers=config["model"]["num_lstm_layers"],          # 减少LSTM层数
         output_size=1, 
-        dropout=0.2            # 减少dropout
+        dropout=config["model"]["dropout"]            # 减少dropout
     )
     model = model.to(selected_device)
     print(f"模型已创建并移动到设备: {selected_device}")
-    print(f"模型参数: 隐藏层大小=128, LSTM层数=2, dropout=0.2")
+    print(f"模型参数: 隐藏层大小={config['model']['lstm_size']}, "
+          f"LSTM层数={config['model']['num_lstm_layers']}, "
+          f"dropout={config['model']['dropout']}")
+    
     # 创建时间戳文件夹
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = f"outputs/{timestamp}"
@@ -102,12 +109,13 @@ def main():
     
     # 保存训练历史
     if config["training"]["save_history"]:
+        import pickle
         history_path = f"{output_dir}/training_history.pkl"
         with open(history_path, 'wb') as f:
             pickle.dump(training_history, f)
         print(f"训练历史已保存到: {history_path}")
     
-    # 预测结果
+    # 进行预测
     predicted_train = predict_on_dataset(model, dataset_train, config)
     predicted_val = predict_on_dataset(model, dataset_val, config)
     
@@ -130,14 +138,14 @@ def main():
             'actual_train': data_y_train_original,
             'predicted_train': predicted_train_original
         })
-        train_results_path = f"{output_dir}/train_predictions_fast_test.csv"
+        train_results_path = f"{output_dir}/train_predictions_final.csv"
         results_df.to_csv(train_results_path, index=False)
         
         results_val_df = pd.DataFrame({
             'actual_val': data_y_val_original,
             'predicted_val': predicted_val_original
         })
-        val_results_path = f"{output_dir}/val_predictions_fast_test.csv"
+        val_results_path = f"{output_dir}/val_predictions_final.csv"
         results_val_df.to_csv(val_results_path, index=False)
         
         print(f"预测结果已保存到: {train_results_path}, {val_results_path}")

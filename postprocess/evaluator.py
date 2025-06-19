@@ -82,27 +82,12 @@ def evaluate_model_performance(train_true, train_pred, val_true, val_pred, test_
         results['validation'] = val_metrics
         print_metrics(val_metrics, "验证集")
     
-    # 测试集评估（如果提供）
+    # 测试集评估
     if test_true is not None and test_pred is not None:
         test_metrics = calculate_metrics(test_true, test_pred, "测试集")
         if test_metrics:
             results['test'] = test_metrics
             print_metrics(test_metrics, "测试集")
-    
-    # 计算过拟合程度
-    if train_metrics and val_metrics:
-        overfitting_ratio = (train_metrics['mse'] - val_metrics['mse']) / train_metrics['mse'] * 100
-        results['overfitting_analysis'] = {
-            'mse_diff_percentage': float(overfitting_ratio),
-            'is_overfitting': overfitting_ratio < -10  # 如果验证集MSE比训练集高10%以上
-        }
-        
-        print(f"\n过拟合分析:")
-        print(f"MSE差异: {overfitting_ratio:.2f}%")
-        if results['overfitting_analysis']['is_overfitting']:
-            print("⚠️  模型可能存在过拟合")
-        else:
-            print("✅ 模型拟合良好")
     
     return results
 
@@ -129,24 +114,3 @@ def save_evaluation_results(results, output_dir, filename="evaluation_results.js
         
     except Exception as e:
         print(f"保存评估结果失败: {e}")
-
-def compare_predictions(y_true, y_pred, n_samples=10):
-    """
-    比较真实值和预测值的前n个样本
-    
-    Args:
-        y_true: 真实值
-        y_pred: 预测值
-        n_samples: 显示的样本数量
-    """
-    print(f"\n=== 预测值对比 (前{n_samples}个样本) ===")
-    print("样本\t真实值\t\t预测值\t\t误差\t\t相对误差(%)")
-    print("-" * 60)
-    
-    for i in range(min(n_samples, len(y_true))):
-        true_val = y_true[i]
-        pred_val = y_pred[i]
-        error = abs(true_val - pred_val)
-        rel_error = (error / abs(true_val)) * 100 if true_val != 0 else 0
-        
-        print(f"{i+1}\t{true_val:.6f}\t{pred_val:.6f}\t{error:.6f}\t{rel_error:.2f}%") 

@@ -45,7 +45,7 @@ def plot_prediction_comparison(y_true, y_pred, output_dir, dataset_name="validat
     except Exception as e:
         print(f"生成预测对比图失败: {e}")
 
-def plot_training_history(train_losses, val_losses, output_dir, figsize=(10, 6)):
+def plot_training_history(train_losses, val_losses, output_dir, learning_rates=None, figsize=(15, 5)):
     """
     绘制训练历史曲线
     
@@ -53,22 +53,47 @@ def plot_training_history(train_losses, val_losses, output_dir, figsize=(10, 6))
         train_losses: 训练损失列表
         val_losses: 验证损失列表
         output_dir: 输出目录
+        learning_rates: 学习率列表（可选）
         figsize: 图像大小
     """
     try:
         output_dir = ensure_output_dir(output_dir)
         
-        plt.figure(figsize=figsize)
         epochs = range(1, len(train_losses) + 1)
         
-        plt.plot(epochs, train_losses, 'b-', label='Training Loss', linewidth=2)
-        plt.plot(epochs, val_losses, 'r-', label='Validation Loss', linewidth=2)
-        
-        plt.title('Training and Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
+        # 如果有学习率数据，创建包含两个子图的图像
+        if learning_rates is not None:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+            
+            # 损失曲线
+            ax1.plot(epochs, train_losses, 'b-', label='Training Loss', linewidth=2)
+            ax1.plot(epochs, val_losses, 'r-', label='Validation Loss', linewidth=2)
+            ax1.set_title('Training and Validation Loss')
+            ax1.set_xlabel('Epoch')
+            ax1.set_ylabel('Loss')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            
+            # 学习率曲线
+            ax2.plot(epochs, learning_rates, 'g-', label='Learning Rate', linewidth=2)
+            ax2.set_title('Learning Rate Schedule')
+            ax2.set_xlabel('Epoch')
+            ax2.set_ylabel('Learning Rate')
+            ax2.set_yscale('log')  # 使用对数刻度显示学习率
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+        else:
+            # 只有损失曲线
+            plt.figure(figsize=(10, 6))
+            plt.plot(epochs, train_losses, 'b-', label='Training Loss', linewidth=2)
+            plt.plot(epochs, val_losses, 'r-', label='Validation Loss', linewidth=2)
+            plt.title('Training and Validation Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
         
         # 保存图像
         filename = f"{output_dir}/training_history.png"
@@ -164,7 +189,7 @@ def plot_scatter_comparison(y_true, y_pred, output_dir, dataset_name="validation
         print(f"生成散点对比图失败: {e}")
 
 def create_comprehensive_plots(train_true, train_pred, val_true, val_pred, 
-                             output_dir, train_losses=None, val_losses=None):
+                             output_dir, train_losses=None, val_losses=None, learning_rates=None):
     """
     创建综合的可视化图表
     
@@ -173,6 +198,7 @@ def create_comprehensive_plots(train_true, train_pred, val_true, val_pred,
         val_true, val_pred: 验证集真实值和预测值
         output_dir: 输出目录
         train_losses, val_losses: 训练和验证损失（可选）
+        learning_rates: 学习率历史（可选）
     """
     print("\n=== 生成可视化图表 ===")
     
@@ -192,7 +218,7 @@ def create_comprehensive_plots(train_true, train_pred, val_true, val_pred,
     
     # 训练历史图（如果提供）
     if train_losses is not None and val_losses is not None:
-        plot_training_history(train_losses, val_losses, plots_dir)
+        plot_training_history(train_losses, val_losses, plots_dir, learning_rates)
     
     print("所有可视化图表生成完成")
 
