@@ -33,7 +33,7 @@ class LSTMModel(nn.Module):
         lstm_out, (h_n, c_n) = self.lstm(x)
 
         # reshape output from hidden cell into [batch, features] for `linear_2`
-        x = h_n.permute(1, 0, 2).reshape(batchsize, -1)
+        x = h_n.permute(1, 0, 2).reshape(batchsize, -1) # LSTM最后一层在最后一个时间步的隐藏状态h_n可以看作是对整段序列的压缩表达
 
         x = self.dropout(x)
         predictions = self.linear_2(x)

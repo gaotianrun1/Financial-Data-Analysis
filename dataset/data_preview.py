@@ -554,7 +554,7 @@ def analyze_time_periods(file_path):
         return None
 
 if __name__ == "__main__":
-    file_path = "/ssdwork/gaotianrun/findataset/test_converted.parquet"
+    file_path = "/ssdwork/gaotianrun/findataset/test.parquet"
     
     # Preview data first
     print("=== Data Preview ===")

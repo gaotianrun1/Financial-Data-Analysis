@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 import os
 import time
+import random
 
 from dataset.data_loader import TimeSeriesDataset
 from dataset.preprocess import check_preprocessed_data_exists, load_preprocessed_data, preprocess_data
@@ -14,6 +15,16 @@ from postprocess.evaluator import evaluate_model_performance, save_evaluation_re
 from postprocess.visualizer import create_comprehensive_plots
 from datetime import datetime
 import pickle
+
+def set_random_seed(seed=42, deterministic=True):
+    """
+    设置所有随机种子以确保实验结果的可重复性
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 def select_device():
     if torch.cuda.is_available():
@@ -60,8 +71,6 @@ def main():
     
     config["data"]["window_size"] = metadata["window_size"]
     config["model"]["input_size"] = metadata["feature_count"]
-    config["training"]["num_epoch"] = 100
-    config["training"]["batch_size"] = 512
     
     print(f"\n=== 数据配置 ===")
     print(f"输入维度: {config['model']['input_size']}")
@@ -69,9 +78,7 @@ def main():
     print(f"训练轮数: {config['training']['num_epoch']}")
     print(f"批次大小: {config['training']['batch_size']}")
     
-    # 选择和创建模型
     model_type = config["model"].get("model_type", "lstm")
-    print(f"\n=== 模型选择 ===")
     print(f"当前模型类型: {model_type.upper()}")
     
     # 创建模型
@@ -163,5 +170,6 @@ def main():
     print(f"最终模型已保存到: {model_path}")
 
 if __name__ == "__main__":
+    set_random_seed()
     main() 
 

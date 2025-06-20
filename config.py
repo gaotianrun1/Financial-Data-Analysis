@@ -12,15 +12,15 @@ CONFIG = {
         "processed_dir": "data/processed_data",
 
         # 数据采用
-        "sample_size": 50000,
-        "test_sample_size": 10000,
+        "sample_size": 100000,
+        "test_sample_size": 43200,
         
         # 特征设置
         "target_column": "label",
         
         # 时间序列设置
-        "window_size": 60,
-        "train_split_size": 0.90,
+        "window_size": 60, # 被preprocess覆盖掉了
+        "train_split_size": 0.80,
     },
     "data_processing": {
         # 缺失值处理
@@ -56,18 +56,18 @@ CONFIG = {
         "enable_interaction_features": True,     # 启用交互特征
         
         # 订单流特征配置
-        "order_flow_windows": [5, 10, 20],       # 订单流滚动窗口
+        "order_flow_windows": [5, 15, 30],       # 订单流滚动窗口
         
         # 流动性特征配置
-        "liquidity_windows": [5, 10, 20],        # 流动性特征滚动窗口
+        "liquidity_windows": [5, 15, 30],        # 流动性特征滚动窗口
         
         # 微观结构特征配置
-        "microstructure_windows": [5, 10, 20],   # 微观结构特征滚动窗口
+        "microstructure_windows": [5, 15, 30],   # 微观结构特征滚动窗口
         # 买卖压力特征配置
-        "pressure_windows": [5, 10, 20],         # 压力特征滚动窗口
+        "pressure_windows": [5, 15, 30],         # 压力特征滚动窗口
         
         # 统计特征配置
-        "statistical_windows": [5, 10, 20],      # 统计特征窗口
+        "statistical_windows": [5, 15, 30],      # 统计特征窗口
         "lag_periods": [1, 2, 3, 5, 10],        # 滞后期
         "rolling_operations": ["mean", "std", "max", "min"], # 滚动统计操作
         
@@ -90,7 +90,7 @@ CONFIG = {
     },
     "model": {
         # 通用模型设置
-        "model_type": "transformer",  # "lstm" 或 "transformer"
+        "model_type": "lstm",  # "lstm" 或 "transformer"
         "input_size": 896, # 将根据实际选择的特征数量动态调整，删掉一些特征
         "output_size": 1,
         "dropout": 0.3,   # 增加dropout以防止过拟合
@@ -103,17 +103,17 @@ CONFIG = {
         "num_transformer_layers": 2,
         "transformer_hidden_size": 64,  # 必须能被attention_heads整除
         "num_attention_heads": 4,       # 注意力头数量
-        "transformer_dropout": 0.1,     # Transformer特定的dropout
+        "transformer_dropout": 0.15,
     },
     "training": {
         "device": "cuda", # "cuda" or "cpu"
-        "batch_size": 512,
-        "num_epoch": 100,
+        "batch_size": 2048,
+        "num_epoch": 30,
         "learning_rate": 0.001,
         
         # 训练优化配置
         "scheduler_type": "cosine",  # "step", "cosine", "plateau"
-        "print_interval": 5,         # 每隔多少个epoch打印一次
+        "print_interval": 1,         # 每隔多少个epoch打印一次
         "save_history": True,        # 是否保存训练历史
         "scheduler_step_size": 40,
         
