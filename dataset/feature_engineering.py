@@ -106,14 +106,13 @@ class IntegratedFeatureEngineer:
         """添加订单流特征"""
         df_enhanced = df.copy()
         
-        # 基础订单流不平衡指标
-        # OFI (Order Flow Imbalance) - 衡量买卖订单的不平衡程度
+        # 基础订单流不平衡指标OFI，衡量买卖订单的不平衡程度
         df_enhanced['order_flow_imbalance'] = (df['bid_qty'] - df['ask_qty']) / (df['bid_qty'] + df['ask_qty'] + 1e-10)
         
-        # 交易流不平衡 - 衡量主动买卖的不平衡
+        # 交易流不平衡，衡量主动买卖的不平衡
         df_enhanced['trade_flow_imbalance'] = (df['buy_qty'] - df['sell_qty']) / (df['buy_qty'] + df['sell_qty'] + 1e-10)
         
-        # 净订单流 - 绝对数量差异
+        # 净订单流，绝对数量差异
         df_enhanced['net_order_flow'] = df['bid_qty'] - df['ask_qty']
         df_enhanced['net_trade_flow'] = df['buy_qty'] - df['sell_qty']
         
@@ -129,15 +128,15 @@ class IntegratedFeatureEngineer:
         # 滚动订单流特征
         windows = self.feature_engineer_config.get('order_flow_windows', [5, 10, 20])
         for window in windows:
-            # 滚动订单流不平衡均值
+            # 滚动订单流不平衡均值，捕捉订单流的趋势和波动性
             df_enhanced[f'order_flow_imbalance_ma_{window}'] = df_enhanced['order_flow_imbalance'].rolling(window=window, min_periods=1).mean()
             df_enhanced[f'trade_flow_imbalance_ma_{window}'] = df_enhanced['trade_flow_imbalance'].rolling(window=window, min_periods=1).mean()
             
-            # 滚动标准差 - 衡量订单流波动性
+            # 滚动标准差，衡量订单流波动性
             df_enhanced[f'order_flow_imbalance_std_{window}'] = df_enhanced['order_flow_imbalance'].rolling(window=window, min_periods=1).std()
             df_enhanced[f'trade_flow_imbalance_std_{window}'] = df_enhanced['trade_flow_imbalance'].rolling(window=window, min_periods=1).std()
             
-            # 订单流动量指标
+            # 订单流动量指标，识别订单流的突变和反转信号
             df_enhanced[f'order_flow_momentum_{window}'] = df_enhanced['order_flow_imbalance'] - df_enhanced[f'order_flow_imbalance_ma_{window}']
             df_enhanced[f'trade_flow_momentum_{window}'] = df_enhanced['trade_flow_imbalance'] - df_enhanced[f'trade_flow_imbalance_ma_{window}']
             
@@ -153,21 +152,20 @@ class IntegratedFeatureEngineer:
     def _add_liquidity_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加流动性特征"""
         df_enhanced = df.copy()
-        
-        # 流动性指标
-        # 总流动性
+
+        # 总流动性，反映市场的容纳能力
         df_enhanced['total_liquidity'] = df['bid_qty'] + df['ask_qty']
         
-        # 流动性不对称性
+        # 流动性不对称性，正值表示买方流动性充足
         df_enhanced['liquidity_asymmetry'] = (df['bid_qty'] - df['ask_qty']) / (df['bid_qty'] + df['ask_qty'] + 1e-10)
         
-        # 流动性消耗率 - 成交量与挂单量的比率
+        # 流动性消耗率，衡量市场冲击和流动性消耗速度
         df_enhanced['liquidity_consumption_rate'] = df['volume'] / (df['bid_qty'] + df['ask_qty'] + 1e-10)
         
-        # 买卖流动性比率
+        # 买卖流动性比率，买卖两侧流动性的相对强度
         df_enhanced['bid_ask_liquidity_ratio'] = df['bid_qty'] / (df['ask_qty'] + 1e-10)
         
-        # 主动交易与被动流动性的比率
+        # 主动交易与被动流动性的比率，高比率表示市场活跃
         df_enhanced['active_passive_ratio'] = (df['buy_qty'] + df['sell_qty']) / (df['bid_qty'] + df['ask_qty'] + 1e-10)
         
         self.liquidity_features.extend([
@@ -181,10 +179,10 @@ class IntegratedFeatureEngineer:
             # 平均流动性
             df_enhanced[f'avg_liquidity_{window}'] = df_enhanced['total_liquidity'].rolling(window=window, min_periods=1).mean()
             
-            # 流动性波动率
+            # 流动性波动率，反应市场流动性稳定性
             df_enhanced[f'liquidity_volatility_{window}'] = df_enhanced['total_liquidity'].rolling(window=window, min_periods=1).std()
             
-            # 流动性消耗率均值
+            # 流动性消耗率均值，反映近期市场上挂单被快速吃掉的强弱
             df_enhanced[f'avg_liquidity_consumption_{window}'] = df_enhanced['liquidity_consumption_rate'].rolling(window=window, min_periods=1).mean()
             
             self.liquidity_features.extend([
@@ -197,24 +195,23 @@ class IntegratedFeatureEngineer:
     def _add_microstructure_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加市场微观结构特征"""
         df_enhanced = df.copy()
-        
-        # 价格影响指标
-        # 买卖价差代理（使用数量差异）
+
+        # 买卖价差代理，反映市场的交易成本和信息不对称程度
         df_enhanced['spread_proxy'] = np.abs(df['bid_qty'] - df['ask_qty'])
         
-        # 市场深度
+        # 市场深度，评估大单执行的市场冲击
         df_enhanced['market_depth'] = np.minimum(df['bid_qty'], df['ask_qty'])
         
-        # 订单簿斜率 - 衡量流动性分布
+        # 订单簿斜率，衡量市场弹性和价格稳定性
         df_enhanced['orderbook_slope'] = (df['bid_qty'] + df['ask_qty']) / (np.abs(df['bid_qty'] - df['ask_qty']) + 1e-10)
         
-        # 执行概率 - 基于订单大小和可用流动性
+        # 执行概率，给定订单规模下的预期执行概率
         df_enhanced['execution_probability'] = np.minimum(df['buy_qty'] / (df['ask_qty'] + 1e-10), 1.0)
         
-        # 市场冲击指标
+        # 市场冲击指标，成交对市场流动性的消耗程度
         df_enhanced['market_impact'] = df['volume'] / (df['bid_qty'] + df['ask_qty'] + 1e-10)
         
-        # 信息比率 - 永久价格影响代理
+        # 信息比率，衡量交易中信息含量的比率
         df_enhanced['information_ratio'] = (df['buy_qty'] - df['sell_qty']) / (df['volume'] + 1e-10)
         
         self.microstructure_features.extend([
@@ -293,17 +290,15 @@ class IntegratedFeatureEngineer:
     def _add_statistical_features(self, df: pd.DataFrame, target_col: str) -> pd.DataFrame:
         """添加统计特征"""
         df_enhanced = df.copy()
-        
-        # 基础市场数据列
+
         key_cols = ['bid_qty', 'ask_qty', 'buy_qty', 'sell_qty', 'volume']
-        
-        # 滚动窗口统计
         stat_windows = self.feature_engineer_config.get('statistical_windows', [5, 10, 20])
         operations = ['mean', 'std', 'max', 'min']
         
         for col in key_cols:
             for window in stat_windows:
                 for op in operations:
+                    # 基础统计特征
                     feature_name = f'{col}_{op}_{window}'
                     if op == 'mean':
                         df_enhanced[feature_name] = df[col].rolling(window=window, min_periods=1).mean()
@@ -316,7 +311,7 @@ class IntegratedFeatureEngineer:
                     
                     self.statistical_features.append(feature_name)
                 
-                # Z-score特征 - 标准化偏离度
+                # Z-score特征，当前值相对于历史均值的标准化偏离度
                 rolling_mean = df[col].rolling(window=window, min_periods=1).mean()
                 rolling_std = df[col].rolling(window=window, min_periods=1).std()
                 z_score_name = f'{col}_zscore_{window}'
@@ -324,27 +319,26 @@ class IntegratedFeatureEngineer:
                 df_enhanced[z_score_name] = (df[col] - rolling_mean) / rolling_std_safe
                 self.statistical_features.append(z_score_name)
                 
-                # 相对变化率
+                # 相对变化率，捕捉趋势和动量信号
                 pct_change_name = f'{col}_pct_change_{window}'
                 df_enhanced[pct_change_name] = df[col].pct_change(periods=window)
                 self.statistical_features.append(pct_change_name)
         
-        # 滞后特征 - 重点关注标签的历史值
+        # 滞后特征，历史数据的记忆效应
         lag_periods = self.feature_engineer_config.get('lag_periods', [1, 2, 3, 5, 10])
         if target_col in df.columns:
             for lag in lag_periods:
                 lag_name = f'{target_col}_lag_{lag}'
                 df_enhanced[lag_name] = df[target_col].shift(lag)
                 self.statistical_features.append(lag_name)
-        
-        # 市场数据的滞后特征
+
         for col in ['volume']:
             for lag in [1, 2, 3]:
                 lag_name = f'{col}_lag_{lag}'
                 df_enhanced[lag_name] = df[col].shift(lag)
                 self.statistical_features.append(lag_name)
         
-        # 差分特征
+        # 差分特征，提高模型稳定性
         for col in key_cols:
             df_enhanced[f'{col}_diff_1'] = df[col].diff(1)
             df_enhanced[f'{col}_diff_2'] = df[col].diff(2)
@@ -356,8 +350,9 @@ class IntegratedFeatureEngineer:
     def _add_time_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加时间特征"""
         df_enhanced = df.copy()
-        # 似乎没看到休市，所以没加交易时段特征
-        # 基础时间特征，捕捉交易时间的周期性规律
+        # 似乎没看到休市，所以没加交易时段相关特征
+
+        # 基础时间特征
         df_enhanced['hour'] = df_enhanced.index.hour
         df_enhanced['minute'] = df_enhanced.index.minute
         df_enhanced['day_of_week'] = df_enhanced.index.dayofweek
@@ -384,7 +379,7 @@ class IntegratedFeatureEngineer:
     def _add_interaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加交互特征"""
         df_enhanced = df.copy()
-        # 买卖量与流动性的交互
+        # 买卖主动交易与被动流动的交互
         df_enhanced['buy_liquidity_interaction'] = df['buy_qty'] * df['bid_qty']
         df_enhanced['sell_liquidity_interaction'] = df['sell_qty'] * df['ask_qty']
         
@@ -396,7 +391,7 @@ class IntegratedFeatureEngineer:
         if 'buy_pressure' in df_enhanced.columns and 'liquidity_consumption_rate' in df_enhanced.columns:
             df_enhanced['pressure_liquidity_interaction'] = df_enhanced['buy_pressure'] * df_enhanced['liquidity_consumption_rate']
         
-        # 时间与市场数据的交互
+        # 时间与市场数据的交互，不同时段成交量的差异化效应
         if 'hour' in df_enhanced.columns:
             df_enhanced['volume_hour_interaction'] = df['volume'] * df_enhanced['hour']
             df_enhanced['order_flow_hour_interaction'] = (df['bid_qty'] - df['ask_qty']) * df_enhanced['hour']

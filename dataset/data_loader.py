@@ -10,8 +10,6 @@ from sklearn.preprocessing import RobustScaler, QuantileTransformer
 import warnings
 warnings.filterwarnings('ignore')
 
-# 基础数据加载和预处理模块
-
 def load_parquet_data(config):
     """
     加载本地parquet数据文件，进行数据清洗和预处理(现在只用在无特征工程版本了)
@@ -169,7 +167,7 @@ def remove_highly_correlated_features(df, correlation_threshold=0.95, target_col
     for i in range(len(corr_matrix.columns)):
         for j in range(i+1, len(corr_matrix.columns)):
             if corr_matrix.iloc[i, j] > correlation_threshold:
-                # 删除第二个特征（保留第一个）
+                # 删除第二个特征
                 feature_to_remove = corr_matrix.columns[j]
                 if feature_to_remove not in removed_features_candidates:
                     removed_features_candidates.append(feature_to_remove)
@@ -298,7 +296,7 @@ def handle_financial_outliers(df, method='iqr', window='1D', target_col='label')
     
     # 按时间窗口分组处理
     for time_window in df_processed.groupby(pd.Grouper(freq=window)):
-        window_data = time_window[1]  # 获取当前窗口的数据
+        window_data = time_window[1]
         
         for col in feature_cols:
             if window_data[col].std() == 0:
@@ -313,7 +311,7 @@ def handle_financial_outliers(df, method='iqr', window='1D', target_col='label')
                 upper_bound = Q3 + 1.5 * IQR
             
             elif method == 'quantile':
-                # 分位数方法（使用1%和99%分位数）
+                # 分位数方法
                 lower_bound = window_data[col].quantile(0.01)
                 upper_bound = window_data[col].quantile(0.99)
             
@@ -322,7 +320,7 @@ def handle_financial_outliers(df, method='iqr', window='1D', target_col='label')
                 median = window_data[col].median()
                 mad = np.median(np.abs(window_data[col] - median))
                 modified_zscore = 0.6745 * (window_data[col] - median) / mad
-                outliers = np.abs(modified_zscore) > 3.5  # 通常使用3.5作为阈值
+                outliers = np.abs(modified_zscore) > 3.5
                 
                 if outliers.sum() > 0:
                     # 使用EWMA进行平滑处理
@@ -376,14 +374,14 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
     # 初始化预处理信息记录
     current_preprocessing_info = {}
     
-    # 1. 处理缺失值和无穷值
+    # 处理缺失值和无穷值
     df_processed, removed_missing = handle_missing_values(
         df_processed,
         missing_threshold=processing_config.get("missing_threshold", 0.2),
         method=processing_config.get("missing_method", "ffill")
     )
     
-    # 2. 删除低方差特征
+    # 删除低方差特征
     if is_training_data:
         df_processed, removed_low_var = remove_low_variance_features(
             df_processed,
@@ -402,7 +400,7 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
                 print(f"删除特征: {len(existing_low_var)}个")
                 df_processed = df_processed.drop(columns=existing_low_var)
     
-    # 3. 删除高度相关特征
+    # 删除高度相关特征
     if is_training_data:
         df_processed, removed_corr = remove_highly_correlated_features(
             df_processed,
@@ -422,7 +420,7 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
                 print(f"删除特征: {len(existing_corr)}个")
                 df_processed = df_processed.drop(columns=existing_corr)
     
-    # 4. 基于与目标变量相关性的特征选择
+    # 基于与目标变量相关性的特征选择
     if is_training_data and target_col in df_processed.columns:
         df_processed, selected_features, feature_scores = select_features_by_target_correlation(
             df_processed,
@@ -451,7 +449,7 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
         else:
             raise ValueError("测试数据中没有任何训练数据中选择的特征！")
     
-    # 5. 处理异常值
+    # 处理异常值
     df_processed, outlier_info = handle_financial_outliers(
         df_processed,
         method=processing_config.get("outlier_method", "iqr"),
@@ -475,7 +473,7 @@ def process_data(df, config=None, is_training_data=True, preprocessing_info=None
 
 def load_processed_data(config, use_cache=True):
     """
-    加载清理后的parquet数据，用于在preprocess中保存为pickle
+    加载清理后的parquet数据，用于在【无特征工程版本】preprocess中保存为pickle
     """
     processed_dir = config["data"]["processed_dir"]
     train_processed_path = os.path.join(processed_dir, "train_processed.parquet")

@@ -33,7 +33,7 @@ def preprocess_data_with_feature_engineering(sample_size: int = 1000,
     
     实现三步数据处理流程：
     1. 初步数据清理（data_loader.process_data）
-    2. 特征工程（feature_engineering）
+    2. 特征工程
     3. 再次数据清理
     """
     config = CONFIG.copy()
