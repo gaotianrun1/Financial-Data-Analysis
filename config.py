@@ -6,13 +6,12 @@ CONFIG = {
         "key_adjusted_close": "5. adjusted close",
     },
     "data": {
-        # 数据源设置
         "data_source": "parquet",  # "alpha_vantage" 或 "parquet"
         "train_path": "/ssdwork/gaotianrun/findataset/train.parquet",
         "test_path": "/ssdwork/gaotianrun/findataset/test_converted.parquet",
         "processed_dir": "data/processed_data",
 
-        # 数据采样
+        # 数据采用
         "sample_size": 50000,
         "test_sample_size": 10000,
         
@@ -20,7 +19,7 @@ CONFIG = {
         "target_column": "label",
         
         # 时间序列设置
-        "window_size": 20,
+        "window_size": 60,
         "train_split_size": 0.90,
     },
     "data_processing": {
@@ -47,7 +46,6 @@ CONFIG = {
     },
     # 量化金融特征工程配置
     "feature_engineering": {
-        # 特征工程开关
         "enable_feature_engineering": True,
         "enable_order_flow_features": True,      # 启用订单流特征
         "enable_liquidity_features": True,       # 启用流动性特征
@@ -91,27 +89,38 @@ CONFIG = {
         "color_pred_test": "#FF4136",
     },
     "model": {
+        # 通用模型设置
+        "model_type": "transformer",  # "lstm" 或 "transformer"
         "input_size": 896, # 将根据实际选择的特征数量动态调整，删掉一些特征
+        "output_size": 1,
+        "dropout": 0.3,   # 增加dropout以防止过拟合
+        
+        # LSTM特定设置
         "num_lstm_layers": 2,
         "lstm_size": 64,  # 增加隐藏层大小以处理更多特征
-        "dropout": 0.3,   # 增加dropout以防止过拟合
+        
+        # Transformer特定设置
+        "num_transformer_layers": 2,
+        "transformer_hidden_size": 64,  # 必须能被attention_heads整除
+        "num_attention_heads": 4,       # 注意力头数量
+        "transformer_dropout": 0.1,     # Transformer特定的dropout
     },
     "training": {
         "device": "cuda", # "cuda" or "cpu"
         "batch_size": 512,
         "num_epoch": 100,
         "learning_rate": 0.001,
-        "scheduler_step_size": 40,
         
-        # 新增训练优化配置
+        # 训练优化配置
         "scheduler_type": "cosine",  # "step", "cosine", "plateau"
-        "print_interval": 10,         # 每隔多少个epoch打印一次
+        "print_interval": 5,         # 每隔多少个epoch打印一次
         "save_history": True,        # 是否保存训练历史
+        "scheduler_step_size": 40,
         
         # Checkpoint保存设置
         "checkpoint": {
             "enabled": True,         # 是否启用checkpoint保存
-            "save_interval": 15,    # 每隔多少个epoch保存一次
+            "save_interval": 150,    # 每隔多少个epoch保存一次
             "max_keep": 0,          # 最多保留多少个checkpoint（0表示保留所有）
         }
     }

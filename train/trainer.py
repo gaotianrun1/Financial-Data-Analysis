@@ -147,7 +147,7 @@ def train_model(model, dataset_train, dataset_val, config, checkpoint_dir=None):
         dataset_train: 训练数据集
         dataset_val: 验证数据集
         config: 配置字典
-        checkpoint_dir: checkpoint保存目录（可选）
+        checkpoint_dir: checkpoint保存目录
     
     Returns:
         model: 训练后的模型
@@ -170,8 +170,8 @@ def train_model(model, dataset_train, dataset_val, config, checkpoint_dir=None):
     optimizer = optim.Adam(
         model.parameters(), 
         lr=config["training"]["learning_rate"], 
-        betas=(0.9, 0.98), 
-        eps=1e-9
+        # betas=(0.9, 0.98), 
+        # eps=1e-9
     )
     
     # 创建学习率调度器

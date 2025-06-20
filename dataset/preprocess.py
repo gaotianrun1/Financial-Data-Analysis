@@ -460,6 +460,4 @@ if __name__ == "__main__":
             save_dir=args.save_dir,
             enable_feature_engineering=args.enable_feature_engineering
         )
-        print("量化金融背景下的特征工程数据预处理成功完成!")
-    
-    print(f"处理结果: {summary['summary_stats']}")
+        print("特征工程数据预处理成功完成!")

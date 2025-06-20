@@ -27,17 +27,14 @@ class LSTMModel(nn.Module):
     def forward(self, x):
         batchsize = x.shape[0]
 
-        # layer 1
         x = self.linear_1(x)
         x = self.relu(x)
 
-        # LSTM layer
         lstm_out, (h_n, c_n) = self.lstm(x)
 
         # reshape output from hidden cell into [batch, features] for `linear_2`
         x = h_n.permute(1, 0, 2).reshape(batchsize, -1)
 
-        # layer 2
         x = self.dropout(x)
         predictions = self.linear_2(x)
         return predictions[:, -1] 

@@ -6,7 +6,7 @@ import time
 
 from dataset.data_loader import TimeSeriesDataset
 from dataset.preprocess import check_preprocessed_data_exists, load_preprocessed_data, preprocess_data
-from model.lstm_model import LSTMModel
+from model.model_factory import create_model
 from train.trainer import train_model
 from inference.predictor import predict_on_dataset
 from config import CONFIG
@@ -63,26 +63,25 @@ def main():
     config["training"]["num_epoch"] = 100
     config["training"]["batch_size"] = 512
     
-    print(f"\n=== 模型配置 ===")
+    print(f"\n=== 数据配置 ===")
     print(f"输入维度: {config['model']['input_size']}")
     print(f"窗口大小: {config['data']['window_size']}")
     print(f"训练轮数: {config['training']['num_epoch']}")
     print(f"批次大小: {config['training']['batch_size']}")
     
+    # 选择和创建模型
+    model_type = config["model"].get("model_type", "lstm")
+    print(f"\n=== 模型选择 ===")
+    print(f"当前模型类型: {model_type.upper()}")
+    
     # 创建模型
-    model = LSTMModel(
-        input_size=config["model"]["input_size"], 
-        hidden_layer_size=128,  # 减少隐藏层大小以加快训练
-        num_layers=2,          # 减少LSTM层数
-        output_size=1, 
-        dropout=0.2            # 减少dropout
-    )
+    model = create_model(config)
     model = model.to(selected_device)
-    print(f"模型已创建并移动到设备: {selected_device}")
-    print(f"模型参数: 隐藏层大小=128, LSTM层数=2, dropout=0.2")
+    
     # 创建时间戳文件夹
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = f"outputs/{timestamp}"
+    model_suffix = f"_{model_type}" if model_type != "lstm" else ""
+    output_dir = f"outputs/{timestamp}{model_suffix}"
     print(f"创建输出目录: {output_dir}")
 
     models_dir = f"{output_dir}/models"
@@ -91,7 +90,7 @@ def main():
     os.makedirs(checkpoints_dir, exist_ok=True)
     
     # 训练模型
-    print("\n=== 开始训练 ===")
+    print(f"\n=== 开始训练 ({model_type.upper()}模型) ===")
     start_time = time.time()
     
     model, training_history = train_model(model, dataset_train, dataset_val, config, checkpoints_dir)
@@ -122,6 +121,11 @@ def main():
         data_y_train_original, predicted_train_original,
         data_y_val_original, predicted_val_original
     )
+    # 添加模型信息到评估结果
+    evaluation_results['model_type'] = model_type
+    evaluation_results['model_config'] = config["model"]
+    evaluation_results['training_time'] = training_time
+    
     save_evaluation_results(evaluation_results, output_dir)
 
     # 保存预测结果
@@ -130,14 +134,14 @@ def main():
             'actual_train': data_y_train_original,
             'predicted_train': predicted_train_original
         })
-        train_results_path = f"{output_dir}/train_predictions_fast_test.csv"
+        train_results_path = f"{output_dir}/train_predictions_{model_type}.csv"
         results_df.to_csv(train_results_path, index=False)
         
         results_val_df = pd.DataFrame({
             'actual_val': data_y_val_original,
             'predicted_val': predicted_val_original
         })
-        val_results_path = f"{output_dir}/val_predictions_fast_test.csv"
+        val_results_path = f"{output_dir}/val_predictions_{model_type}.csv"
         results_val_df.to_csv(val_results_path, index=False)
         
         print(f"预测结果已保存到: {train_results_path}, {val_results_path}")
@@ -154,7 +158,7 @@ def main():
     )
 
     # 保存模型
-    model_path = f"{models_dir}/lstm_model_final.pth"
+    model_path = f"{models_dir}/{model_type}_model_final.pth"
     torch.save(model.state_dict(), model_path)
     print(f"最终模型已保存到: {model_path}")
 
