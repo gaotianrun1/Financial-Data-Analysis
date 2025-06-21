@@ -13,11 +13,4 @@ from .visualizer import (
     plot_training_history,
     plot_residuals,
     plot_scatter_comparison,
-    
-    # 旧代码
-    plot_raw_data,
-    plot_train_val_split,
-    plot_predictions,
-    plot_validation_zoom,
-    plot_next_day_prediction
 ) 

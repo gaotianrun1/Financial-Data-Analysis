@@ -29,13 +29,13 @@ class SimpleBacktester:
         # 生成交易信号
         signals = np.zeros(n_periods)
         for i in range(n_periods):
-            # 计算预测的涨幅
-            predicted_return = (predictions[i+1] - actual_prices[i]) / actual_prices[i]
+            # 计算预测价格的趋势变化
+            predicted_trend = (predictions[i+1] - predictions[i]) / predictions[i]
             
-            # 只有预测涨幅超过阈值才买入
-            if predicted_return > self.threshold:
+            # 只有预测趋势向上且超过阈值才买入
+            if predicted_trend > self.threshold:
                 signals[i] = 1  # 全仓买入股票
-            else:  # 预测涨幅不足或会跌
+            else:  # 预测趋势向下或涨幅不足
                 signals[i] = 0  # 持现金
         
         # 计算每分钟的价格收益率
@@ -177,38 +177,178 @@ class SimpleBacktester:
             'test_start_idx': test_start_idx
         }
     
-    def plot_backtest_results(self, backtest_result, save_path=None):
-        """绘制回测结果图表"""
+    def plot_backtest_results(self, backtest_result, save_dir=None, actual_prices=None, predictions=None):
+        """绘制回测结果图表，分别保存多个图表"""
         strategy_returns = backtest_result['strategy_returns']
         portfolio_history = backtest_result['portfolio_history']
+        signals = backtest_result['signals']
         
-        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-        fig.suptitle('Simple Strategy Backtest Results', fontsize=14, fontweight='bold')
+        if save_dir is None:
+            save_dir = "."
+        
+        # 1. 价格预测和交易信号图（大图，重点）
+        self._plot_price_signals(actual_prices, predictions, signals, f"{save_dir}/01_price_signals.png")
+        
+        # 2. 组合价值和回撤分析
+        self._plot_portfolio_performance(portfolio_history, f"{save_dir}/02_portfolio_performance.png")
+        
+        # 3. 收益分析
+        self._plot_returns_analysis(strategy_returns, f"{save_dir}/03_returns_analysis.png")
+        
+        # 4. 持仓分析
+        self._plot_position_analysis(signals, f"{save_dir}/04_position_analysis.png")
+        
+        print(f"所有图表已保存到目录: {save_dir}")
+    
+    def _plot_price_signals(self, actual_prices, predictions, signals, save_path):
+        """绘制价格预测和交易信号图，包含局部放大图"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(30, 14))
+        
+        # 添加基准价格
+        actual_with_base = actual_prices + self.price
+        pred_with_base = predictions + self.price
+        
+        # 标记买卖点
+        buy_points = []
+        sell_points = []
+        current_position = 0
+        
+        for i, signal in enumerate(signals):
+            if signal != current_position:
+                if signal == 1:  # 买入
+                    buy_points.append((i, actual_with_base[i]))
+                else:  # 卖出
+                    sell_points.append((i, actual_with_base[i]))
+                current_position = signal
+        
+        # 第一个子图：完整数据
+        time_index = range(len(actual_with_base))
+        ax1.plot(time_index, actual_with_base, linewidth=1.5, color='#2E86AB', 
+                label='Actual Price', alpha=0.9)
+        ax1.plot(time_index, pred_with_base, linewidth=1.5, color='#E74C3C', 
+                label='Predicted Price', alpha=0.8, linestyle='--')
+        
+        # 绘制买卖点
+        if buy_points:
+            buy_x, buy_y = zip(*buy_points)
+            ax1.scatter(buy_x, buy_y, color='green', marker='^', s=80, 
+                       label=f'Buy Signals ({len(buy_points)})', zorder=5, alpha=0.8)
+        
+        if sell_points:
+            sell_x, sell_y = zip(*sell_points)
+            ax1.scatter(sell_x, sell_y, color='red', marker='v', s=80, 
+                       label=f'Sell Signals ({len(sell_points)})', zorder=5, alpha=0.8)
+        
+        ax1.set_title('Price Prediction & Trading Signals (Full Data)', fontsize=16, fontweight='bold')
+        ax1.set_ylabel('Price', fontsize=12)
+        ax1.legend(fontsize=10)
+        ax1.grid(True, alpha=0.3)
+        
+        # 添加统计信息
+        total_trades = len(buy_points) + len(sell_points)
+        ax1.text(0.02, 0.98, f'Total Trades: {total_trades}\nThreshold: {self.threshold:.1%}\nCommission: {self.commission:.2%}', 
+                transform=ax1.transAxes, verticalalignment='top', fontsize=10,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        # 第二个子图：前60个样本的局部放大图
+        zoom_samples = 60
+        zoom_end = min(zoom_samples, len(actual_with_base))
+        
+        time_index_zoom = range(zoom_end)
+        ax2.plot(time_index_zoom, actual_with_base[:zoom_end], linewidth=2.5, color='#2E86AB', 
+                label='Actual Price', alpha=0.9, marker='o', markersize=4)
+        ax2.plot(time_index_zoom, pred_with_base[:zoom_end], linewidth=2.5, color='#E74C3C', 
+                label='Predicted Price', alpha=0.8, linestyle='--', marker='s', markersize=3)
+        
+        # 绘制局部买卖点
+        zoom_buy_points = [(x, y) for x, y in buy_points if x < zoom_end]
+        zoom_sell_points = [(x, y) for x, y in sell_points if x < zoom_end]
+        
+        if zoom_buy_points:
+            buy_x_zoom, buy_y_zoom = zip(*zoom_buy_points)
+            ax2.scatter(buy_x_zoom, buy_y_zoom, color='green', marker='^', s=150, 
+                       label=f'Buy Signals ({len(zoom_buy_points)})', zorder=5, alpha=0.9)
+        
+        if zoom_sell_points:
+            sell_x_zoom, sell_y_zoom = zip(*zoom_sell_points)
+            ax2.scatter(sell_x_zoom, sell_y_zoom, color='red', marker='v', s=150, 
+                       label=f'Sell Signals ({len(zoom_sell_points)})', zorder=5, alpha=0.9)
+        
+        ax2.set_title(f'Detailed View (First {zoom_end} Minutes)', fontsize=16, fontweight='bold')
+        ax2.set_xlabel('Time (Minutes)', fontsize=12)
+        ax2.set_ylabel('Price', fontsize=12)
+        ax2.legend(fontsize=10)
+        ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"价格信号图已保存: {save_path}")
+    
+    def _plot_portfolio_performance(self, portfolio_history, save_path):
+        """绘制组合表现图"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
         
         # 累积收益曲线
-        axes[0, 0].plot(portfolio_history, linewidth=2, color='#2E86AB')
-        axes[0, 0].set_title('Portfolio Value')
-        axes[0, 0].set_ylabel('Portfolio Value')
-        axes[0, 0].grid(True, alpha=0.3)
+        ax1.plot(portfolio_history, linewidth=2, color='#2E86AB')
+        ax1.set_title('Portfolio Value', fontsize=14, fontweight='bold')
+        ax1.set_ylabel('Portfolio Value')
+        ax1.grid(True, alpha=0.3)
+        
+        # 添加收益统计
+        total_return = (portfolio_history[-1] - 1) * 100
+        ax1.text(0.02, 0.98, f'Total Return: {total_return:.2f}%', 
+               transform=ax1.transAxes, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
         
         # 回撤分析
         rolling_max = np.maximum.accumulate(portfolio_history)
         drawdowns = (portfolio_history - rolling_max) / rolling_max
-        axes[0, 1].fill_between(range(len(drawdowns)), drawdowns, 0, 
-                               color='#E74C3C', alpha=0.7)
-        axes[0, 1].set_title('Drawdown Analysis')
-        axes[0, 1].set_ylabel('Drawdown Ratio') # 回撤比例
-        axes[0, 1].grid(True, alpha=0.3)
+        ax2.fill_between(range(len(drawdowns)), drawdowns, 0, 
+                        color='#E74C3C', alpha=0.7)
+        ax2.set_title('Drawdown Analysis', fontsize=14, fontweight='bold')
+        ax2.set_xlabel('Time (Minutes)')
+        ax2.set_ylabel('Drawdown Ratio')
+        ax2.grid(True, alpha=0.3)
         
-        # 收益分布
-        axes[1, 0].hist(strategy_returns, bins=50, alpha=0.7, color='#27AE60')
-        axes[1, 0].axvline(np.mean(strategy_returns), color='red', linestyle='--', 
-                          label=f'Mean: {np.mean(strategy_returns):.4f}')
-        axes[1, 0].set_title('Returns Distribution')
-        axes[1, 0].set_xlabel('Returns') # 收益率
-        axes[1, 0].set_ylabel('Frequency') # 频次
-        axes[1, 0].legend()
-        axes[1, 0].grid(True, alpha=0.3)
+        # 添加最大回撤
+        max_drawdown = np.min(drawdowns) * 100
+        ax2.text(0.02, 0.02, f'Max Drawdown: {max_drawdown:.2f}%', 
+               transform=ax2.transAxes, verticalalignment='bottom',
+               bbox=dict(boxstyle='round', facecolor='lightcoral', alpha=0.8))
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"组合表现图已保存: {save_path}")
+    
+    def _plot_returns_analysis(self, strategy_returns, save_path):
+        """绘制收益分析图"""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # 只分析非零收益（即持股期间的收益）
+        non_zero_returns = strategy_returns[strategy_returns != 0]
+        
+        if len(non_zero_returns) > 0:
+            # 持股期间收益分布
+            ax1.hist(non_zero_returns, bins=30, alpha=0.7, color='#27AE60', edgecolor='black', linewidth=0.5)
+            ax1.axvline(np.mean(non_zero_returns), color='red', linestyle='--', linewidth=2,
+                       label=f'Mean: {np.mean(non_zero_returns):.4f}')
+            ax1.axvline(0, color='black', linestyle='-', alpha=0.3)
+            
+            # 添加统计信息
+            positive_pct = np.sum(non_zero_returns > 0) / len(non_zero_returns) * 100
+            ax1.text(0.02, 0.98, f'Win Rate: {positive_pct:.1f}%\nTotal Trades: {len(non_zero_returns)}', 
+                    transform=ax1.transAxes, verticalalignment='top', fontsize=10,
+                    bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+            
+            ax1.set_title('Trading Returns Distribution\n(Holding Periods Only)', fontsize=14, fontweight='bold')
+            ax1.set_xlabel('Returns')
+            ax1.set_ylabel('Frequency')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+        else:
+            ax1.text(0.5, 0.5, 'No Trading Returns', ha='center', va='center', transform=ax1.transAxes)
         
         # 滚动夏普比率
         window_size = min(168, len(strategy_returns) // 4)
@@ -222,17 +362,64 @@ class SimpleBacktester:
                 else:
                     rolling_sharpe.append(0)
             
-            axes[1, 1].plot(rolling_sharpe, color='#8E44AD', linewidth=2)
-            axes[1, 1].axhline(0, color='black', linestyle='-', alpha=0.3)
-            axes[1, 1].set_title(f'Rolling Sharpe Ratio ({window_size}h window)')
-            axes[1, 1].set_ylabel('Sharpe Ratio') # 夏普比率
-            axes[1, 1].grid(True, alpha=0.3)
+            ax2.plot(rolling_sharpe, color='#8E44AD', linewidth=2)
+            ax2.axhline(0, color='black', linestyle='-', alpha=0.3)
+            ax2.set_title(f'Rolling Sharpe Ratio\n{window_size}h window', fontsize=14, fontweight='bold')
+            ax2.set_xlabel('Time')
+            ax2.set_ylabel('Sharpe Ratio')
+            ax2.grid(True, alpha=0.3)
         
         plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"收益分析图已保存: {save_path}")
+    
+    def _plot_position_analysis(self, signals, save_path):
+        """绘制持仓分析图"""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
         
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"图表已保存到: {save_path}")
+        # 持仓时间分布
+        hold_periods = []
+        current_period = 1
+        current_position = signals[0]
+        
+        for i in range(1, len(signals)):
+            if signals[i] == current_position:
+                current_period += 1
+            else:
+                hold_periods.append((current_position, current_period))
+                current_position = signals[i]
+                current_period = 1
+        hold_periods.append((current_position, current_period))
+        
+        stock_periods = [p[1] for p in hold_periods if p[0] == 1]
+        cash_periods = [p[1] for p in hold_periods if p[0] == 0]
+        
+        if stock_periods and cash_periods:
+            ax1.hist([stock_periods, cash_periods], bins=20, alpha=0.7, 
+                    label=['Stock Holding', 'Cash Holding'], 
+                    color=['green', 'orange'], edgecolor='black', linewidth=0.5)
+            ax1.set_title('Holding Period Distribution', fontsize=14, fontweight='bold')
+            ax1.set_xlabel('Holding Period (Minutes)')
+            ax1.set_ylabel('Frequency')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+        
+        # 持仓比例饼图
+        stock_time = np.sum(signals == 1)
+        cash_time = np.sum(signals == 0)
+        
+        labels = ['Stock Position', 'Cash Position']
+        sizes = [stock_time, cash_time]
+        colors = ['green', 'orange']
+        
+        ax2.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+        ax2.set_title('Position Time Allocation', fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"持仓分析图已保存: {save_path}")
 
 
 if __name__ == "__main__":
@@ -260,8 +447,8 @@ if __name__ == "__main__":
     # 创建回测器
     backtester = SimpleBacktester(
         price=30,        # 假设基准价格30元
-        commission=2/10000, # 0.03% 交易手续费
-        threshold=0.001  # 涨幅阈值
+        commission=2/10000, # 交易手续费
+        threshold=0.01  # 涨幅阈值
     )
     
     try:
@@ -275,7 +462,9 @@ if __name__ == "__main__":
         
         backtester.plot_backtest_results(
             results['backtest_result'],
-            f"{backtest_output_dir}/simple_strategy_backtest.png"
+            save_dir=backtest_output_dir,
+            actual_prices=actual_prices,
+            predictions=predictions
         )
         
         # 处理NaN值和numpy数据类型，确保JSON可序列化
@@ -314,7 +503,8 @@ if __name__ == "__main__":
             json.dump(backtest_metrics, f, indent=2, ensure_ascii=False)
         
         print(f"\n 与买入持有策略对比:")
-        buy_hold_return = (actual_prices[-1] / actual_prices[0] - 1)
+        actual_with_base = actual_prices + backtester.price
+        buy_hold_return = (actual_with_base[-1] / actual_with_base[0] - 1)
         strategy_return = results['metrics']['total_return']
         
         print(f"买入持有收益: {buy_hold_return:.2%}")
