@@ -250,8 +250,8 @@ class SimpleBacktester:
                 transform=ax1.transAxes, verticalalignment='top', fontsize=10,
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
         
-        # 第二个子图：前60个样本的局部放大图
-        zoom_samples = 60
+        # 第二个子图：前两个小时的局部放大图
+        zoom_samples = 120
         zoom_end = min(zoom_samples, len(actual_with_base))
         
         time_index_zoom = range(zoom_end)
@@ -426,8 +426,8 @@ if __name__ == "__main__":
     print("开始加载训练结果并进行回测评估")
     print("=" * 60)
 
-    model_dir = 'outputs/result_transformer'
-    pred_file = f'{model_dir}/val_predictions_transformer.csv'
+    model_dir = 'outputs/result_lstm'
+    pred_file = f'{model_dir}/val_predictions_lstm.csv'
 
     df = pd.read_csv(pred_file)
     print(f"成功加载预测数据，共 {len(df)} 个样本")
