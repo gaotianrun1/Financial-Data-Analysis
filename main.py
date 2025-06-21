@@ -170,6 +170,7 @@ def main():
     print(f"最终模型已保存到: {model_path}")
 
 if __name__ == "__main__":
+    # python main.py
     set_random_seed()
     main() 
 

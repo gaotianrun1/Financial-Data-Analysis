@@ -554,7 +554,7 @@ def analyze_time_periods(file_path):
         return None
 
 if __name__ == "__main__":
-    file_path = "/ssdwork/gaotianrun/findataset/test.parquet"
+    file_path = "/ssdwork/gaotianrun/findataset/train.parquet"
     
     # Preview data first
     print("=== Data Preview ===")
@@ -563,34 +563,25 @@ if __name__ == "__main__":
     # Analyze available time periods
     print("\n=== Time Period Analysis ===")
     time_periods = analyze_time_periods(file_path)
+
+    # Use recommended time periods for multi-level visualization
+    print("\n=== Starting Multi-level Time Series Visualization ===")
     
-    if time_periods:
-        # Use recommended time periods for multi-level visualization
-        print("\n=== Starting Multi-level Time Series Visualization ===")
-        
-        # Minute-level visualization (one day)
-        print(f"\n1. Plotting minute-level data ({time_periods['best_day']})...")
-        plot_time_series_multi_level(file_path, time_level='minute', 
-                                    specific_period=time_periods['best_day'])
-        
-        # Hourly-level visualization (one month)  
-        print(f"\n2. Plotting hourly-level data ({time_periods['best_month']})...")
-        plot_time_series_multi_level(file_path, time_level='hour',
-                                    specific_period=time_periods['best_month'])
-        
-        # Daily-level visualization (one year)
-        print(f"\n3. Plotting daily-level data ({time_periods['best_year']})...")
-        plot_time_series_multi_level(file_path, time_level='day',
-                                    specific_period=time_periods['best_year'])
-        
-        print("\n=== All Visualizations Completed ===")
-        print("\nUsage:")
-        print("1. Run this script directly to view recommended time period visualizations")
-        print("2. Call plot_time_series_multi_level(file_path, 'minute', '2023-06-15') to view specific date")
-        print("3. Call plot_time_series_multi_level(file_path, 'hour', '2023-06') to view specific month") 
-        print("4. Call plot_time_series_multi_level(file_path, 'day', '2023') to view specific year")
-    else:
-        print("Time period analysis failed, using original plotting method...")
-        plot_time_series(file_path)
+    # Minute-level visualization (one day)
+    print(f"\n1. Plotting minute-level data ({time_periods['best_day']})...")
+    plot_time_series_multi_level(file_path, time_level='minute', 
+                                specific_period=time_periods['best_day'])
+    
+    # Hourly-level visualization (one month)  
+    print(f"\n2. Plotting hourly-level data ({time_periods['best_month']})...")
+    plot_time_series_multi_level(file_path, time_level='hour',
+                                specific_period=time_periods['best_month'])
+    
+    # Daily-level visualization (one year)
+    print(f"\n3. Plotting daily-level data ({time_periods['best_year']})...")
+    plot_time_series_multi_level(file_path, time_level='day',
+                                specific_period=time_periods['best_year'])
+    
+    print("\n=== All Visualizations Completed ===")
 
     
