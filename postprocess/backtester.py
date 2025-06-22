@@ -426,8 +426,8 @@ if __name__ == "__main__":
     print("开始加载训练结果并进行回测评估")
     print("=" * 60)
 
-    model_dir = 'outputs/result_lstm'
-    pred_file = f'{model_dir}/val_predictions_lstm.csv'
+    model_dir = 'outputs/result_transformer'
+    pred_file = f'{model_dir}/val_predictions_transformer.csv'
 
     df = pd.read_csv(pred_file)
     print(f"成功加载预测数据，共 {len(df)} 个样本")

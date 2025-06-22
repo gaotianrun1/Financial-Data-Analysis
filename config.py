@@ -90,7 +90,7 @@ CONFIG = {
     },
     "model": {
         # 通用模型设置
-        "model_type": "lstm",  # "lstm" 或 "transformer"
+        "model_type": "transformer_time_aware",  # "lstm" 或 "transformer" 或 "transformer_time_aware"
         "input_size": 896, # 将根据实际选择的特征数量动态调整，删掉一些特征
         "output_size": 1,
         "dropout": 0.3,   # 增加dropout以防止过拟合

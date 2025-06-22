@@ -268,5 +268,5 @@ def result_visualizations(result_dir="outputs/result_lstm"):
 if __name__ == "__main__":
     # python postprocess/visualizer.py
 
-    result_dir = "outputs/result_transformer" # "outputs/result_transformer" # "outputs/result_lstm"
+    result_dir = "outputs/result_tstransformer" # "outputs/result_transformer" # "outputs/result_lstm"
     result_visualizations(result_dir)
