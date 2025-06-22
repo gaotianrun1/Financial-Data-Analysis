@@ -22,7 +22,7 @@ class PositionalEncoding(nn.Module):
         return x + self.pe[:x.size(0), :]
 
 class TimeAwareAttention(nn.Module):
-    """时间感知注意力机制 - 让模型更关注近期数据"""
+    """时间感知注意力机制"""
     def __init__(self, d_model, num_heads=8, time_decay=0.1):
         super(TimeAwareAttention, self).__init__()
         self.d_model = d_model
@@ -35,13 +35,8 @@ class TimeAwareAttention(nn.Module):
         
     def forward(self, x):
         batch_size, seq_len, d_model = x.shape
-
-        time_positions = torch.arange(seq_len, device=x.device).float()
-        time_weights = torch.exp(-torch.abs(self.time_decay) * (seq_len - 1 - time_positions))
         
-        time_weights = time_weights / time_weights.sum()
-        
-        # 创建注意力偏置矩阵
+        # 创建时间感知的注意力偏置矩阵
         attn_bias = torch.zeros(seq_len, seq_len, device=x.device)
         for i in range(seq_len):
             for j in range(seq_len):
